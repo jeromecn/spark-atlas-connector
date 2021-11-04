@@ -27,6 +27,6 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>spark-atlas-connector_2.11</artifactId>
+  <artifactId>spark-atlas-connector_2.12</artifactId>
   <packaging>jar</packaging>
 </project>
