@@ -19,23 +19,23 @@ package com.hortonworks.spark.atlas.sql
 
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-
 import com.hortonworks.spark.atlas.sql.CommandsHarvester.WriteToDataSourceV2Harvester
 import com.hortonworks.spark.atlas.sql.SparkExecutionPlanProcessor.SinkDataSourceWriter
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.{InsertIntoHadoopFsRelationCommand, SaveIntoDataSourceCommand}
 import org.apache.spark.sql.execution.datasources.v2.WriteToDataSourceV2Exec
-import org.apache.spark.sql.execution.streaming.sources.MicroBatchWriter
+import org.apache.spark.sql.execution.streaming.sources.MicroBatchWrite
 import org.apache.spark.sql.hive.execution._
-import org.apache.spark.sql.sources.v2.writer.{DataWriterFactory, WriterCommitMessage}
 import com.hortonworks.spark.atlas._
 import com.hortonworks.spark.atlas.types.metadata
 import com.hortonworks.spark.atlas.utils.Logging
 import org.apache.atlas.model.instance.AtlasObjectId
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.analysis.PersistedView
+import org.apache.spark.sql.connector.write.{DataWriterFactory, PhysicalWriteInfo, WriterCommitMessage}
+import org.apache.spark.sql.connector.write.streaming.{StreamingDataWriterFactory, StreamingWrite}
 import org.apache.spark.sql.execution.streaming.StreamExecution
-import org.apache.spark.sql.sources.v2.writer.streaming.StreamWriter
 import org.apache.spark.sql.streaming.SinkProgress
 import org.apache.spark.sql.streaming.StreamingQueryListener.QueryProgressEvent
 
@@ -82,7 +82,7 @@ class SparkExecutionPlanProcessor(
 
       outNodes ++= Seq(
         WriteToDataSourceV2Exec(
-          new MicroBatchWriter(0,
+          new MicroBatchWrite(0,
             new SinkDataSourceWriter(sink)), qd.qe.sparkPlan))
     }
 
@@ -170,14 +170,9 @@ class SparkExecutionPlanProcessor(
 
 object SparkExecutionPlanProcessor {
 
-  class SinkDataSourceWriter(val sinkProgress: SinkProgress) extends StreamWriter {
-    override def createWriterFactory(): DataWriterFactory[InternalRow] =
-      throw new UnsupportedOperationException("should not reach here!")
+  class SinkDataSourceWriter(val sinkProgress: SinkProgress) extends StreamingWrite {
 
-    override def commit(messages: Array[WriterCommitMessage]): Unit =
-      throw new UnsupportedOperationException("should not reach here!")
-
-    override def abort(messages: Array[WriterCommitMessage]): Unit =
+    override def createStreamingWriterFactory(info: PhysicalWriteInfo): StreamingDataWriterFactory =
       throw new UnsupportedOperationException("should not reach here!")
 
     override def commit(epochId: Long, messages: Array[WriterCommitMessage]): Unit =

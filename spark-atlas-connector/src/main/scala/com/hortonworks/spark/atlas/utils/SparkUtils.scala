@@ -162,6 +162,10 @@ object SparkUtils extends Logging {
     formatDatabaseName(identifier.database.getOrElse(getCurrentDatabase))
   }
 
+  def getDatabaseName(multipartIdentifier: Seq[String]): String = {
+    formatDatabaseName(multipartIdentifier.head)
+  }
+
   // scalastyle:off
   /**
    * This is based on the logic how Spark handles database name (borrowed from Apache Spark v2.4.0).
@@ -170,6 +174,10 @@ object SparkUtils extends Logging {
   // scalastyle:on
   def getTableName(identifier: TableIdentifier): String = {
     formatTableName(identifier.table)
+  }
+
+  def getTableName(multipartIdentifier: Seq[String]): String = {
+    formatTableName(multipartIdentifier.last)
   }
 
   /**
@@ -206,17 +214,19 @@ object SparkUtils extends Logging {
 
     thriftServerListener match {
       case Some(listener) =>
-        val qeString = qe.toString()
-        // Based on the QueryExecution to find out the session id. This is quite cost, but
-        // currently it is the way to correlate query plan to session.
-        val sessId = listener.getExecutionList.reverseIterator
-          .find(_.executePlan == qeString)
-          .map(_.sessionId)
-        sessId.flatMap { id =>
-          listener.getSessionList.reverseIterator.find(_.sessionId == id)
-        }
-          .map(_.userName)
-          .getOrElse(currUser())
+//        val qeString = qe.toString()
+//        // Based on the QueryExecution to find out the session id. This is quite cost, but
+//        // currently it is the way to correlate query plan to session.
+//        listener.
+//        val sessId = listener.getExecutionList.reverseIterator
+//          .find(_.executePlan == qeString)
+//          .map(_.sessionId)
+//        sessId.flatMap { id =>
+//          listener.getSessionList.reverseIterator.find(_.sessionId == id)
+//        }
+//          .map(_.userName)
+//          .getOrElse(currUser())
+        currUser()
 
       case None => currUser()
     }

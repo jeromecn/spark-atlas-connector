@@ -31,14 +31,15 @@ import org.apache.spark.sql.execution.datasources.{InsertIntoHadoopFsRelationCom
 import org.apache.spark.sql.hive.execution._
 import org.apache.spark.sql.kafka010.atlas.ExtractFromDataSource
 import org.apache.spark.sql.sources.BaseRelation
-import org.apache.spark.sql.execution.datasources.v2.{DataSourceV2Relation, DataSourceV2ScanExec, WriteToDataSourceV2Exec}
-import org.apache.spark.sql.execution.streaming.sources.MicroBatchWriter
-import org.apache.spark.sql.sources.v2.writer.DataSourceWriter
+import org.apache.spark.sql.execution.datasources.v2.{BatchScanExec, DataSourceV2Relation, MicroBatchScanExec, WriteToDataSourceV2Exec}
+import org.apache.spark.sql.execution.streaming.sources.MicroBatchWrite
 import com.hortonworks.spark.atlas.{AtlasClientConf, SACAtlasEntityWithDependencies, SACAtlasReferenceable}
 import com.hortonworks.spark.atlas.sql.SparkExecutionPlanProcessor.SinkDataSourceWriter
 import com.hortonworks.spark.atlas.types.{AtlasEntityUtils, external, internal}
 import com.hortonworks.spark.atlas.utils.SparkUtils.sparkSession
 import com.hortonworks.spark.atlas.utils.{Logging, SparkUtils}
+import org.apache.spark.sql.catalyst.plans.QueryPlan
+import org.apache.spark.sql.connector.write.BatchWrite
 import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
 import org.apache.spark.sql.streaming.SinkProgress
 
@@ -141,7 +142,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       // from table entities
       val child = node.child.asInstanceOf[Project].child
       val inputEntities = child match {
-        case r: UnresolvedRelation => Seq(prepareEntity(r.tableIdentifier))
+        case r: UnresolvedRelation => Seq(prepareEntity(r.multipartIdentifier))
         case _: OneRowRelation => Seq.empty
         case n =>
           logWarn(s"Unknown leaf node: $n")
@@ -190,15 +191,22 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
         qd: QueryDetail): Seq[SACAtlasReferenceable] = {
       val inputEntities = discoverInputsEntities(node.query, qd.qe.executedPlan)
 
-      val outputEntities = node.writer match {
-        case w: MicroBatchWriter if w.writer.isInstanceOf[SinkDataSourceWriter] =>
-          discoverOutputEntities(w.writer.asInstanceOf[SinkDataSourceWriter].sinkProgress)
+      val outputEntities = node.batchWrite match {
+        case w: MicroBatchWrite if w.writeSupport.isInstanceOf[SinkDataSourceWriter] =>
+          discoverOutputEntities(w.writeSupport.asInstanceOf[SinkDataSourceWriter].sinkProgress)
 
         case w => discoverOutputEntities(w)
       }
 
       makeProcessEntities(inputEntities, outputEntities, qd)
     }
+  }
+
+  def prepareEntity(multipartIdentifier: Seq[String]): SACAtlasReferenceable = {
+    val tableName = SparkUtils.getTableName(multipartIdentifier)
+    val dbName = SparkUtils.getDatabaseName(multipartIdentifier)
+    val tableDef = SparkUtils.getExternalCatalog().getTable(dbName, tableName)
+    tableToEntity(tableDef)
   }
 
   def prepareEntity(tableIdentifier: TableIdentifier): SACAtlasReferenceable = {
@@ -292,7 +300,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
     }
   }
 
-  private def discoverOutputEntities(writer: DataSourceWriter): Seq[SACAtlasReferenceable] = {
+  private def discoverOutputEntities(writer: BatchWrite): Seq[SACAtlasReferenceable] = {
     writer match {
       case HWCEntities(hwcEntities) => Seq(hwcEntities)
       case KafkaEntities(kafkaEntities) => Seq(kafkaEntities)
@@ -310,7 +318,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       val inputsEntities = discoverInputsEntities(qd.qe.sparkPlan, qd.qe.executedPlan)
 
       // Supports Spark HWC (destination table entity)
-      val outputEntities = HWCEntities.getHWCEntity(node.writer) match {
+      val outputEntities = HWCEntities.getHWCEntity(node.batchWrite) match {
         case Some(entity) => Seq(entity)
         case None => Seq.empty
       }
@@ -363,21 +371,21 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
         "com.hortonworks.spark.sql.hive.llap.streaming.HiveStreamingDataSourceWriter"
 
       def extractFromWriter(
-          writer: DataSourceWriter): Option[SACAtlasReferenceable] = writer match {
-        case w: DataSourceWriter
+          writer: BatchWrite): Option[SACAtlasReferenceable] = writer match {
+        case w: BatchWrite
           if w.getClass.getCanonicalName.endsWith(BATCH_WRITE) => getHWCEntity(w)
 
-        case w: DataSourceWriter
+        case w: BatchWrite
           if w.getClass.getCanonicalName.endsWith(BATCH_STREAM_WRITE) => getHWCEntity(w)
 
-        case w: DataSourceWriter
+        case w: BatchWrite
           if w.getClass.getCanonicalName.endsWith(STREAM_WRITE) => getHWCEntity(w)
 
-        case w: MicroBatchWriter
+        case w: BatchWrite
           if w.getClass.getMethod("writer").invoke(w)
             .getClass.toString.endsWith(STREAM_WRITE) =>
           extractFromWriter(
-            w.getClass.getMethod("writer").invoke(w).asInstanceOf[DataSourceWriter])
+            w.getClass.getMethod("writer").invoke(w).asInstanceOf[BatchWrite])
 
         case _ => None
       }
@@ -385,22 +393,35 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
 
     def unapply(plan: LogicalPlan): Option[SACAtlasReferenceable] = plan match {
       case ds: DataSourceV2Relation
-          if ds.source.getClass.getCanonicalName.endsWith(HWCSupport.BATCH_READ_SOURCE) =>
-        getHWCEntity(ds.options)
+          if ds.table.getClass.getCanonicalName.endsWith(HWCSupport.BATCH_READ_SOURCE) =>
+        getHWCEntity(ds)
       case _ => None
     }
 
     def unapply(plan: SparkPlan): Option[SACAtlasReferenceable] = plan match {
-      case ds: DataSourceV2ScanExec
-          if ds.source.getClass.getCanonicalName.endsWith(HWCSupport.BATCH_READ_SOURCE) =>
-        getHWCEntity(ds.options)
+      case ds: DataSourceScanExec
+          if ds.relation.getClass.getCanonicalName.endsWith(HWCSupport.BATCH_READ_SOURCE) =>
+        getHWCEntity(ds)
       case _ => None
     }
 
-    def unapply(writer: DataSourceWriter): Option[SACAtlasReferenceable] = {
+    def unapply(writer: BatchWrite): Option[SACAtlasReferenceable] = {
       HWCSupport.extractFromWriter(writer)
     }
 
+    def getHWCEntity(ds: DataSourceV2Relation): Option[SACAtlasReferenceable] = {
+      val db = ds.name
+      val tableName = ds.name
+      Some(external.hiveTableToReference(db, tableName, clusterName))
+    }
+
+    def getHWCEntity(ds: DataSourceScanExec): Option[SACAtlasReferenceable] = {
+      val db = ds.tableIdentifier.map(_.database).getOrElse("default").toString
+      val tableName = ds.tableIdentifier.map(_.table).getOrElse("").toString
+      Some(external.hiveTableToReference(db, tableName, clusterName))
+    }
+
+    // spark 2.4.0
     def getHWCEntity(options: Map[String, String]): Option[SACAtlasReferenceable] = {
       if (options.contains("query")) {
         val sql = options("query")
@@ -411,9 +432,8 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
         val parsedPlan = org.apache.spark.sql.catalyst.parser.CatalystSqlParser.parsePlan(sql)
         parsedPlan.collectLeaves().flatMap {
           case r: UnresolvedRelation =>
-            val db = r.tableIdentifier.database.getOrElse(
-              options.getOrElse("default.db", "default"))
-            val tableName = r.tableIdentifier.table
+            val db = SparkUtils.getDatabaseName(r.multipartIdentifier)
+            val tableName = SparkUtils.getTableName(r.multipartIdentifier)
             Seq(external.hiveTableToReference(db, tableName, clusterName))
           case _: OneRowRelation => Seq.empty
           case n =>
@@ -427,7 +447,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       }
     }
 
-    def getHWCEntity(r: DataSourceWriter): Option[SACAtlasReferenceable] = r match {
+    def getHWCEntity(r: BatchWrite): Option[SACAtlasReferenceable] = r match {
       case _ if r.getClass.getCanonicalName.endsWith(HWCSupport.BATCH_WRITE) =>
         val f = r.getClass.getDeclaredField("options")
         f.setAccessible(true)
@@ -458,10 +478,10 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
 
         Some(external.hiveTableToReference(db, table, clusterName))
 
-      case w: MicroBatchWriter
+      case w: MicroBatchWrite
           if w.getClass.getMethod("writer").invoke(w)
             .getClass.toString.endsWith(HWCSupport.STREAM_WRITE) =>
-        getHWCEntity(w.getClass.getMethod("writer").invoke(w).asInstanceOf[DataSourceWriter])
+        getHWCEntity(w.getClass.getMethod("writer").invoke(w).asInstanceOf[BatchWrite])
 
       case _ => None
     }
@@ -556,7 +576,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
           ExtractFromDataSource.extractSourceTopicsFromKafkaRelation(r.relation)
         case r: RDDScanExec =>
           ExtractFromDataSource.extractSourceTopicsFromDataSourceV1(r).toSet
-        case r: DataSourceV2ScanExec =>
+        case r: DataSourceScanExec =>
           ExtractFromDataSource.extractSourceTopicsFromDataSourceV2(r).toSet
         case _ => Set.empty[KafkaTopicInformation]
       }
@@ -564,8 +584,8 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       convertTopicsToEntities(topics)
     }
 
-    def unapply(r: DataSourceWriter): Option[SACAtlasEntityWithDependencies] = r match {
-      case writer: MicroBatchWriter => ExtractFromDataSource.extractTopic(writer) match {
+    def unapply(r: BatchWrite): Option[SACAtlasEntityWithDependencies] = r match {
+      case writer: MicroBatchWrite => ExtractFromDataSource.extractTopic(writer) match {
         case Some(topicInformation) => Some(external.kafkaToEntity(clusterName, topicInformation))
         case _ => None
       }
