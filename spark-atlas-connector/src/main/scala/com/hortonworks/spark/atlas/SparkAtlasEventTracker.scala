@@ -53,6 +53,7 @@ class SparkAtlasEventTracker(atlasClient: AtlasClient, atlasClientConf: AtlasCli
   mlEventTracker.startThread()
 
   override def onOtherEvent(event: SparkListenerEvent): Unit = {
+    logInfo(s"[onOtherEvent] ${event.toString}")
     if (!enabled) {
       // No op if SAC is disabled
       return
@@ -68,6 +69,7 @@ class SparkAtlasEventTracker(atlasClient: AtlasClient, atlasClientConf: AtlasCli
   }
 
   override def onSuccess(funcName: String, qe: QueryExecution, durationNs: Long): Unit = {
+    logInfo(s"[onSuccess] ${funcName}, ${qe.toString()}")
     if (!enabled) {
       // No op if SAC is disabled
       return
@@ -84,6 +86,7 @@ class SparkAtlasEventTracker(atlasClient: AtlasClient, atlasClientConf: AtlasCli
 
   override def onFailure(funcName: String, qe: QueryExecution, exception: Exception): Unit = {
     // No-op: SAC is one of the listener.
+    logInfo(s"[onFailure] ${funcName}, ${qe.toString()}")
   }
 
 }

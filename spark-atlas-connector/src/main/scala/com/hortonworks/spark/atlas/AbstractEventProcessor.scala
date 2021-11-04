@@ -40,6 +40,7 @@ abstract class AbstractEventProcessor[T: ClassTag] extends Logging {
   }
 
   def pushEvent(event: T): Unit = {
+    logInfo(s"[pushEvent] ${event.toString}")
     event match {
       case e: T =>
         if (!eventQueue.offer(e, timeout, TimeUnit.MILLISECONDS)) {
