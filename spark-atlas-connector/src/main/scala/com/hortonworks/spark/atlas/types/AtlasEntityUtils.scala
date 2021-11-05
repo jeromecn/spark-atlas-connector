@@ -57,8 +57,10 @@ trait AtlasEntityUtils extends Logging {
       tableDefinition: CatalogTable,
       mockDbDefinition: Option[CatalogDatabase] = None): SACAtlasReferenceable = {
     if (SparkUtils.usingRemoteMetastoreService()) {
+      logDebug("[tableToEntity] external.hiveTableToReference")
       external.hiveTableToReference(tableDefinition, clusterName, mockDbDefinition)
     } else {
+      logDebug("[tableToEntity] internal.sparkTableToEntity")
       internal.sparkTableToEntity(tableDefinition, clusterName, mockDbDefinition)
     }
   }

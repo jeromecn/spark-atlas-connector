@@ -35,6 +35,7 @@ trait AtlasClient extends Logging {
 
   final def createEntitiesWithDependencies(
       entity: SACAtlasReferenceable): Unit = this.synchronized {
+    logDebug(s"[createEntitiesWithDependencies] entity: ${entity}")
     entity match {
       case e: SACAtlasEntityWithDependencies =>
         // handle dependencies first
@@ -70,6 +71,7 @@ trait AtlasClient extends Logging {
     }
 
     try {
+      logDebug("[createEntitiesWithDependencies] createEntities => doCreateEntities")
       doCreateEntities(entities)
     } catch {
       case NonFatal(e) =>
@@ -82,6 +84,8 @@ trait AtlasClient extends Logging {
   final def deleteEntityWithUniqueAttr(
       entityType: String, attribute: String): Unit = this.synchronized {
     try {
+      logDebug("[createEntitiesWithDependencies] createEntities => " +
+        "doCreateEntities => doDeleteEntityWithUniqueAttr")
       doDeleteEntityWithUniqueAttr(entityType, attribute)
     } catch {
       case NonFatal(e) =>
@@ -96,7 +100,13 @@ trait AtlasClient extends Logging {
       attribute: String,
       entity: AtlasEntity): Unit = this.synchronized {
     try {
+      logDebug("[createEntitiesWithDependencies] createEntities => " +
+        "doCreateEntities => doDeleteEntityWithUniqueAttr => doUpdateEntityWithUniqueAttr")
       doUpdateEntityWithUniqueAttr(entityType, attribute, entity)
+      logDebug(s"[createEntitiesWithDependencies] doUpdateEntityWithUniqueAttr done, " +
+        s"entityType: ${entityType}, " +
+        s"entity: ${entity}, " +
+        s"attribute: ${attribute}")
     } catch {
       case NonFatal(e) =>
         logWarn(s"Failed to update entity $entity with type $entityType and attribute " +

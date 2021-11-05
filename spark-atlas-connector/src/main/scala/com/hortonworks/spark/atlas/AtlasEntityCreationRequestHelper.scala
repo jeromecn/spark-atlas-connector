@@ -32,6 +32,7 @@ class AtlasEntityCreationRequestHelper(
     (Set[AtlasObjectId], Set[AtlasObjectId])]()
 
   def requestCreation(entities: Seq[SACAtlasReferenceable], queryId: Option[UUID] = None): Unit = {
+    logDebug(s"[RequestHelper] requestCreation, entities:${entities}, queryId:${queryId}")
     queryId match {
       case Some(rid) => updateEntitiesForStreamingQuery(rid, entities)
       case None => updateEntitiesForBatchQuery(entities)
@@ -47,6 +48,7 @@ class AtlasEntityCreationRequestHelper(
   private def updateEntitiesForStreamingQuery(
       queryId: UUID,
       entities: Seq[SACAtlasReferenceable]): Unit = {
+    logDebug("[RequestHelper] requestCreation => updateEntitiesForStreamingQuery")
     // the query is streaming, so which partial of source/sink entities can be seen
     // in specific batch - need to accumulate efficiently
     val processes = entities
@@ -62,6 +64,8 @@ class AtlasEntityCreationRequestHelper(
       AtlasEntityReadHelper.getSeqAtlasObjectIdAttribute(p.entity, "outputs")
     }.toSet
 
+    logDebug(s"[RequestHelper] requestCreation => updateEntitiesForStreamingQuery, " +
+      s"inputs:${inputs}, outputs:${outputs}")
     queryToInputsAndOutputs.get(queryId) match {
       case Some((is, os)) if !inputs.subsetOf(is) || !outputs.subsetOf(os) =>
         // The query is streaming, and at least either inputs or outputs is not a

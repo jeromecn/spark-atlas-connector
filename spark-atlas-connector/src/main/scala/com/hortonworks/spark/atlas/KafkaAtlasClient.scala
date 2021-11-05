@@ -57,6 +57,8 @@ class KafkaAtlasClient(atlasClientConf: AtlasClientConf) extends AtlasHook with 
     val createRequest = new EntityCreateRequestV2(
       SparkUtils.currUser(), entitiesWithExtInfo): HookNotification
 
+    logDebug(s"[KafkaAtlasClient] doCreateEntities => notifyEntities, " +
+      s"createRequest:${createRequest}")
     notifyEntities(Seq(createRequest).asJava, SparkUtils.ugi())
   }
 
@@ -70,6 +72,8 @@ class KafkaAtlasClient(atlasClientConf: AtlasClientConf) extends AtlasHook with 
         attribute)).asJava
     ): HookNotification
 
+    logDebug(s"[KafkaAtlasClient] doDeleteEntityWithUniqueAttr => notifyEntities, " +
+      s"deleteRequest:${deleteRequest}")
     notifyEntities(Seq(deleteRequest).asJava, SparkUtils.ugi())
   }
 
@@ -85,6 +89,8 @@ class KafkaAtlasClient(atlasClientConf: AtlasClientConf) extends AtlasHook with 
       new AtlasEntityWithExtInfo(entity)
     ): HookNotification
 
+    logDebug(s"[KafkaAtlasClient] doUpdateEntityWithUniqueAttr => notifyEntities, " +
+      s"partialUpdateRequest:${partialUpdateRequest}")
     notifyEntities(Seq(partialUpdateRequest).asJava, SparkUtils.ugi())
   }
 }
