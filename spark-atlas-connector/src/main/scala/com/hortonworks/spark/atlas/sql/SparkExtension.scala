@@ -37,6 +37,7 @@ case class SparkAtlasConnectorParser(spark: SparkSession, delegate: ParserInterf
   override def parsePlan(sqlText: String): LogicalPlan = {
     logDebug(s"[SparkAtlasConnectorParser] sqlText: ${sqlText}")
     SQLQuery.set(sqlText)
+    logDebug(s"[SparkAtlasConnectorParser] SQLQuery: ${SQLQuery.get()}")
     delegate.parsePlan(sqlText)
   }
 
