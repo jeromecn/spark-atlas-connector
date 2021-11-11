@@ -221,7 +221,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       "remoteUser" -> SparkUtils.currSessionUser(qd.qe),
       "details" -> qd.qe.toString(),
       "sparkPlanDescription" -> qd.qe.sparkPlan.toString(),
-      "queryText" -> qd.query.get)
+      "queryText" -> qd.query.getOrElse(""))
   }
 
   private def makeProcessEntities(
