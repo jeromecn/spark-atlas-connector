@@ -17,6 +17,8 @@
 
 package com.hortonworks.spark.atlas.sql
 
+import com.hortonworks.spark.atlas.AtlasUtils.logDebug
+
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import com.hortonworks.spark.atlas.sql.CommandsHarvester.WriteToDataSourceV2Harvester
@@ -47,10 +49,11 @@ case class QueryDetail(
     executionId: Long,
     query: Option[String] = None,
     sink: Option[SinkProgress] = None,
-    queryId: Option[UUID] = None)
+    queryId: Option[UUID] = None) extends Logging
 
-object QueryDetail {
+object QueryDetail extends Logging {
   def fromQueryExecutionListener(qe: QueryExecution, durationNs: Long): QueryDetail = {
+    logDebug(s"[fromQueryExecutionListener] query: ${SQLQuery.get()}, qe: ${qe.toString()}")
     QueryDetail(qe, AtlasUtils.issueExecutionId(), Option(SQLQuery.get()))
   }
 
@@ -70,6 +73,7 @@ class SparkExecutionPlanProcessor(
   // TODO: We should handle OVERWRITE to remove the old lineage.
   // TODO: We should consider LLAPRelation later
   override protected def process(qd: QueryDetail): Unit = {
+    logDebug(s"[SparkExecutionPlanProcessor] process, qd: ${qd.toString}")
     var outNodes: Seq[SparkPlan] = qd.qe.sparkPlan.collect {
       case p: UnionExec => p.children
       case p: DataWritingCommandExec => Seq(p)
