@@ -220,7 +220,8 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
     Map("executionId" -> qd.executionId.toString,
       "remoteUser" -> SparkUtils.currSessionUser(qd.qe),
       "details" -> qd.qe.toString(),
-      "sparkPlanDescription" -> qd.qe.sparkPlan.toString())
+      "sparkPlanDescription" -> qd.qe.sparkPlan.toString(),
+      "queryText" -> qd.query.get)
   }
 
   private def makeProcessEntities(
@@ -454,6 +455,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
         val options = f.get(r).asInstanceOf[java.util.Map[String, String]]
         val (db, tableName) = getDbTableNames(
           options.getOrDefault("default.db", "default"), options.getOrDefault("table", ""))
+        logDebug("[getHWCEntity] ")
         Some(external.hiveTableToReference(db, tableName, clusterName))
 
       case _ if r.getClass.getCanonicalName.endsWith(HWCSupport.BATCH_STREAM_WRITE) =>
