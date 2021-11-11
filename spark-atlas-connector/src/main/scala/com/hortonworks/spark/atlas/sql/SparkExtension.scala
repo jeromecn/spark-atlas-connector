@@ -17,6 +17,7 @@
 
 package com.hortonworks.spark.atlas.sql
 
+import com.hortonworks.spark.atlas.utils.Logging
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.parser.ParserInterface
@@ -32,8 +33,9 @@ class SparkExtension extends (SparkSessionExtensions => Unit) {
 }
 
 case class SparkAtlasConnectorParser(spark: SparkSession, delegate: ParserInterface)
-  extends ParserInterface {
+  extends ParserInterface with Logging {
   override def parsePlan(sqlText: String): LogicalPlan = {
+    logDebug(s"[SparkAtlasConnectorParser] sqlText: ${sqlText}")
     SQLQuery.set(sqlText)
     delegate.parsePlan(sqlText)
   }
