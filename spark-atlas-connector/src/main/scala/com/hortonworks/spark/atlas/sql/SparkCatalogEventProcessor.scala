@@ -37,6 +37,7 @@ class SparkCatalogEventProcessor(
       // SAC will not handle any DDL events when remote HMS is used:
       // Hive hook will take care of all DDL events in Hive Metastore Service.
       // No-op here.
+
       return
     }
 

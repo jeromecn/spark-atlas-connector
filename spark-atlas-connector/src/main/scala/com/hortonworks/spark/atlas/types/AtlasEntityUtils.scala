@@ -17,6 +17,7 @@
 
 package com.hortonworks.spark.atlas.types
 
+import com.hortonworks.spark.atlas.sql.QueryDetail
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, CatalogStorageFormat, CatalogTable}
 import com.hortonworks.spark.atlas.{AtlasClientConf, SACAtlasEntityWithDependencies, SACAtlasReferenceable}
 import com.hortonworks.spark.atlas.utils.{Logging, SparkUtils}
@@ -56,13 +57,14 @@ trait AtlasEntityUtils extends Logging {
   def tableToEntity(
       tableDefinition: CatalogTable,
       mockDbDefinition: Option[CatalogDatabase] = None): SACAtlasReferenceable = {
-    if (SparkUtils.usingRemoteMetastoreService()) {
-      logDebug("[tableToEntity] external.hiveTableToReference")
-      external.hiveTableToReference(tableDefinition, clusterName, mockDbDefinition)
-    } else {
-      logDebug("[tableToEntity] internal.sparkTableToEntity")
-      internal.sparkTableToEntity(tableDefinition, clusterName, mockDbDefinition)
-    }
+    internal.sparkTableToEntity(tableDefinition, clusterName, mockDbDefinition)
+//    if (SparkUtils.usingRemoteMetastoreService()) {
+//      logDebug("[tableToEntity] external.hiveTableToReference")
+//      external.hiveTableToReference(tableDefinition, clusterName, mockDbDefinition)
+//    } else {
+//      logDebug("[tableToEntity] internal.sparkTableToEntity")
+//      internal.sparkTableToEntity(tableDefinition, clusterName, mockDbDefinition)
+//    }
   }
 
   def sparkTableToEntity(
@@ -104,4 +106,8 @@ trait AtlasEntityUtils extends Logging {
       outputs.toList
     }
   }
+
+  def sparkColumnLineagesType: String = metadata.COLUMN_LINEAGE
+
+
 }

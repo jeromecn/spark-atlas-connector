@@ -19,8 +19,7 @@ package com.hortonworks.spark.atlas.types
 
 import java.io.File
 import java.net.{URI, URISyntaxException}
-
-import com.hortonworks.spark.atlas.sql.KafkaTopicInformation
+import com.hortonworks.spark.atlas.sql.{KafkaTopicInformation, QueryDetail}
 import org.apache.atlas.AtlasConstants
 import org.apache.atlas.model.instance.{AtlasEntity, AtlasObjectId}
 import org.apache.commons.lang.RandomStringUtils
@@ -30,6 +29,8 @@ import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, CatalogTable}
 import com.hortonworks.spark.atlas.{AtlasUtils, SACAtlasEntityReference, SACAtlasEntityWithDependencies, SACAtlasReferenceable}
 import com.hortonworks.spark.atlas.utils.{JdbcUtils, SparkUtils}
 import org.apache.spark.sql.SparkSession
+
+import javax.management.Query
 
 
 object external {
@@ -229,6 +230,7 @@ object external {
 
   // ================== Hive Catalog entities =====================
   val HIVE_TABLE_TYPE_STRING = "hive_table"
+  val HIVE_COLUMN_TYPE_STR4ING = "hive_column"
 
   // scalastyle:off
   /**
@@ -244,6 +246,14 @@ object external {
       db: String,
       table: String): String = {
     s"${db.toLowerCase}.${table.toLowerCase}@$cluster"
+  }
+
+  def hiveTableUniqueAttribute(
+      cluster: String,
+      db: String,
+      table: String,
+      column: String): String = {
+    s"${db.toLowerCase}.${table.toLowerCase}.${column.toLowerCase}@$cluster"
   }
 
   def hiveTableToReference(

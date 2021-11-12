@@ -17,14 +17,16 @@
 
 package com.hortonworks.spark.atlas.types
 
-import java.util.Date
+import com.hortonworks.spark.atlas.types.external.{HIVE_TABLE_TYPE_STRING, hiveTableUniqueAttribute}
+import com.hortonworks.spark.atlas.types.internal.sparkTableToReference
 
-import com.hortonworks.spark.atlas.{AtlasUtils, SACAtlasEntityWithDependencies, SACAtlasReferenceable}
+import java.util.Date
+import com.hortonworks.spark.atlas.{AtlasUtils, SACAtlasEntityReference, SACAtlasEntityWithDependencies, SACAtlasReferenceable}
 
 import scala.collection.mutable
 import scala.collection.JavaConverters._
 import org.apache.atlas.AtlasConstants
-import org.apache.atlas.model.instance.AtlasEntity
+import org.apache.atlas.model.instance.{AtlasEntity, AtlasObjectId}
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, CatalogStorageFormat, CatalogTable}
 import com.hortonworks.spark.atlas.utils.{Logging, SparkUtils}
 
@@ -79,6 +81,29 @@ object internal extends Logging {
     SparkUtils.getUniqueQualifiedPrefix() + s"$db.$table"
   }
 
+  def sparkTableToReference(
+      db: String,
+      table: String,
+      cluster: String,
+      column: String): SACAtlasReferenceable = {
+    val qualifiedName = s"${db}.${table}.${column}@${cluster}"
+    SACAtlasEntityReference(
+      new AtlasObjectId(metadata.SPARK_COLUMN, "qualifiedName", qualifiedName))
+  }
+
+  def sparkColumnToEntity(
+      table: CatalogTable,
+      db: String,
+      tableName: String,
+      clusterName: String): Seq[SACAtlasReferenceable] = {
+    var columnEntity = Seq[SACAtlasReferenceable]()
+    for (columnName <- table.viewQueryColumnNames) {
+      val a = sparkTableToReference(db, tableName, clusterName, columnName)
+      columnEntity = columnEntity :+ a
+    }
+    columnEntity
+  }
+
   def sparkTableToEntity(
       tblDefinition: CatalogTable,
       clusterName: String,
@@ -94,6 +119,7 @@ object internal extends Logging {
       sparkStorageFormatToEntity(tableDefinition.storage, db, table)
 
     val tblEntity = new AtlasEntity(metadata.TABLE_TYPE_STRING)
+    val columns = sparkColumnToEntity(tblDefinition, db, table, clusterName)
 
     tblEntity.setAttribute("qualifiedName",
       sparkTableUniqueAttribute(db, table))
@@ -104,6 +130,7 @@ object internal extends Logging {
     if (tableDefinition.tracksPartitionsInCatalog) {
       tblEntity.setAttribute("partitionProvider", "Catalog")
     }
+    tblEntity.setAttribute("columns", columns)
     tblEntity.setAttribute("partitionColumnNames", tableDefinition.partitionColumnNames.asJava)
     tableDefinition.bucketSpec.foreach(
       b => tblEntity.setAttribute("bucketSpec", b.toLinkedHashMap.asJava))

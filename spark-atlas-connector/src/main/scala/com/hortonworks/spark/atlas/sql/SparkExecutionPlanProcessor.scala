@@ -53,8 +53,6 @@ case class QueryDetail(
 
 object QueryDetail extends Logging {
   def fromQueryExecutionListener(qe: QueryExecution, durationNs: Long): QueryDetail = {
-    logDebug(s"[fromQueryExecutionListener] query: ${SQLQuery.get()}, qe: ${qe.toString()}")
-    qe.sparkSession
     QueryDetail(qe, AtlasUtils.issueExecutionId(), Option(SQLQuery.get()))
   }
 
