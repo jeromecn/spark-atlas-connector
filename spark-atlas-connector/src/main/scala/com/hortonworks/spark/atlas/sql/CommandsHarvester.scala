@@ -248,12 +248,29 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       case s: ExecutedCommandExec =>
         s.cmd match {
           case c: CreateHiveTableAsSelectCommand =>
-            logDebug(s"[makeColumnLineageEntities] CreateHiveTableAsSelectCommand, " +
+            logDebug(s"[makeColumnLineageEntities] [ExecutedCommandExec] " +
+              s"CreateHiveTableAsSelectCommand, " +
               s"outputDb: ${c.tableDesc.database}, " +
               s"outputTable: ${c.tableDesc}, " +
               s"outputColumns: ${c.outputColumnNames.toString()}, ")
           case c: InsertIntoHiveTable =>
-            logDebug(s"[makeColumnLineageEntities] InsertIntoHiveTable, " +
+            logDebug(s"[makeColumnLineageEntities] [ExecutedCommandExec] " +
+              s"InsertIntoHiveTable, " +
+              s"outputDb: ${c.table.database}, " +
+              s"outputTable: ${c.table.toString()}, " +
+              s"outputColumns: ${c.outputColumnNames.toString()}, ")
+        }
+      case s: DataWritingCommandExec =>
+        s.cmd match {
+          case c: CreateHiveTableAsSelectCommand =>
+            logDebug(s"[makeColumnLineageEntities] [DataWritingCommandExec] " +
+              s"CreateHiveTableAsSelectCommand, " +
+              s"outputDb: ${c.tableDesc.database}, " +
+              s"outputTable: ${c.tableDesc}, " +
+              s"outputColumns: ${c.outputColumnNames.toString()}, ")
+          case c: InsertIntoHiveTable =>
+            logDebug(s"[makeColumnLineageEntities] [DataWritingCommandExec] " +
+              s"InsertIntoHiveTable, " +
               s"outputDb: ${c.table.database}, " +
               s"outputTable: ${c.table.toString()}, " +
               s"outputColumns: ${c.outputColumnNames.toString()}, ")
