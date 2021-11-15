@@ -35,15 +35,85 @@ import com.hortonworks.spark.atlas.utils.Logging
 import org.apache.atlas.model.instance.AtlasObjectId
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.PersistedView
+import org.apache.spark.sql.catalyst.catalog.HiveTableRelation
+import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project}
 import org.apache.spark.sql.connector.write.{DataWriterFactory, PhysicalWriteInfo, WriterCommitMessage}
 import org.apache.spark.sql.connector.write.streaming.{StreamingDataWriterFactory, StreamingWrite}
 import org.apache.spark.sql.execution.streaming.StreamExecution
 import org.apache.spark.sql.streaming.SinkProgress
 import org.apache.spark.sql.streaming.StreamingQueryListener.QueryProgressEvent
 
+import scala.collection.immutable.Stream.Empty
 import scala.collection.mutable
 
+case class ColumnLineage(
+    db: String = "",
+    table: String = "",
+    name: String = "",
+    child: Seq[ColumnLineage] = Seq.empty[ColumnLineage])
 
+object ColumnLineage extends Logging {
+//  def fromQueryExecutionListener(Seq[LogicalPlan], cols: Seq[String]): Seq[ColumnLineage] = {
+//    val columns = Seq.empty[ColumnLineage]
+//
+//    for (c <- qe.optimizedPlan.children) {
+//      val column = Some(ColumnLineage(name = ???, child = ???))
+//      findColumns(c.children, column, "")
+//      columns.++(column)
+//    }
+//
+//    for (c <- cols) {
+//
+//    }
+//
+//    columns
+//  }
+
+  def findColumns(plan: Seq[LogicalPlan],
+                          column: Option[ColumnLineage],
+                          parentColumn: String): Unit = {
+
+    plan.foreach(p => p match {
+      case c: HiveTableRelation =>
+        if (!c.dataCols.isEmpty) {
+          c.dataCols.foreach(dc => if (parentColumn.equals(dc.name)) {
+            // todo
+            column.get.child.++(Some(ColumnLineage(
+              db = dc.qualifier.head,
+              table = dc.qualifier.last,
+              name = dc.name
+            )))
+          })
+        }
+      case c: Aggregate =>
+        if (!c.aggregateExpressions.isEmpty) {
+          for ( ag <- c.aggregateExpressions) {
+            val ags = ag.name.split(" AS ")
+            if (ags.length == 2 && ags.last.split("#").head.equals(parentColumn.split("#").head)) {
+              val reg = "([A-z])+#(\\d)+".r
+              column.get.child.++(Some(ColumnLineage(
+                db = "output", table = "output", name = ags.last.split("#").head
+              )))
+              reg.findAllMatchIn(ags.head).foreach(oriCol =>
+                findColumns(c.children, column, oriCol.group(1)))
+            }
+          }
+        }
+      case c: Project =>
+        for (p <- c.projectList) {
+          val ags = p.name.split(" AS ")
+          if (ags.length == 2 && ags.last.split("#").head.equals(parentColumn.split("#").head)) {
+            findColumns(c.children, column, ags.head)
+          }
+        }
+      case e =>
+        if (!e.children.isEmpty) {
+          findColumns(e.children, column, parentColumn)
+        }
+    })
+  }
+}
 case class QueryDetail(
     qe: QueryExecution,
     executionId: Long,

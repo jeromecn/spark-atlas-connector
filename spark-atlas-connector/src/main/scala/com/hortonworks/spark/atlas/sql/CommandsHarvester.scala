@@ -243,22 +243,19 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
 
   private def makeColumnLineageEntities(qd: QueryDetail): Seq[SACAtlasReferenceable] = {
 
-    logDebug(s"[makeColumnLineageEntities] qd: ${qd}")
     qd.qe.sparkPlan match {
       case s: ExecutedCommandExec =>
         s.cmd match {
-          case c: CreateHiveTableAsSelectCommand =>
-            logDebug(s"[makeColumnLineageEntities] [ExecutedCommandExec] " +
-              s"CreateHiveTableAsSelectCommand, " +
-              s"outputDb: ${c.tableDesc.database}, " +
-              s"outputTable: ${c.tableDesc}, " +
-              s"outputColumns: ${c.outputColumnNames.toString()}, ")
-          case c: InsertIntoHiveTable =>
-            logDebug(s"[makeColumnLineageEntities] [ExecutedCommandExec] " +
-              s"InsertIntoHiveTable, " +
-              s"outputDb: ${c.table.database}, " +
-              s"outputTable: ${c.table.toString()}, " +
-              s"outputColumns: ${c.outputColumnNames.toString()}, ")
+          case c: LoadDataCommand =>
+            logDebug("")
+          case c: CreateViewCommand =>
+            logDebug("")
+          case c: SaveIntoDataSourceCommand =>
+            logDebug("")
+          case c: CreateTableCommand =>
+            logDebug("")
+          case c: CreateDataSourceTableCommand =>
+            logDebug("")
         }
       case s: DataWritingCommandExec =>
         s.cmd match {
@@ -268,6 +265,18 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               s"outputDb: ${c.tableDesc.database}, " +
               s"outputTable: ${c.tableDesc}, " +
               s"outputColumns: ${c.outputColumnNames.toString()}, ")
+            val columns = Seq.empty[ColumnLineage]
+            for (col <- c.outputColumnNames) {
+              val column = Some(ColumnLineage(
+                db = SparkUtils.getDatabaseName(c.tableDesc),
+                table = SparkUtils.getTableName(c.tableDesc),
+                name = col
+              ))
+              ColumnLineage.findColumns(c.children, column, col)
+              columns.++(column)
+            }
+            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+              s"columnsTree: ${columns}")
           case c: InsertIntoHiveTable =>
             logDebug(s"[makeColumnLineageEntities] [DataWritingCommandExec] " +
               s"InsertIntoHiveTable, " +
@@ -275,6 +284,22 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               s"outputTable: ${SparkUtils.getTableName(c.table)}, " +
               s"outputColumns: ${c.outputColumnNames.toString()}, " +
               s"outputColumns: ${c.outputColumns}")
+            val columns = Seq.empty[ColumnLineage]
+            for (col <- c.outputColumnNames) {
+              val column = Some(ColumnLineage(
+                db = SparkUtils.getDatabaseName(c.table),
+                table = SparkUtils.getTableName(c.table),
+                name = col
+              ))
+              ColumnLineage.findColumns(c.children, column, col)
+              columns.++(column)
+            }
+            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+              s"columnsTree: ${columns}")
+          case c: InsertIntoHadoopFsRelationCommand =>
+            logDebug("")
+          case c: CreateDataSourceTableAsSelectCommand =>
+            logDebug("")
         }
     }
 
@@ -345,6 +370,57 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
     writer match {
       case HWCEntities(hwcEntities) => Seq(hwcEntities)
       case KafkaEntities(kafkaEntities) => Seq(kafkaEntities)
+      case e =>
+        logWarn(s"Missing unknown leaf node: $e")
+        Seq.empty
+    }
+  }
+
+
+  private def discoverInputsColumnEntities(
+                                      plan: LogicalPlan,
+                                      executedPlan: SparkPlan): Seq[SACAtlasReferenceable] = {
+    val tChildren = plan.collectLeaves()
+    tChildren.flatMap {
+      case r: HiveTableRelation => Seq(tableToEntity(r.tableMeta))
+      case v: View => Seq(tableToEntity(v.desc))
+      case LogicalRelation(fileRelation: FileRelation, _, catalogTable, _) =>
+        catalogTable.map(tbl => Seq(tableToEntity(tbl))).getOrElse(
+          fileRelation.inputFiles.flatMap(file => Seq(external.pathToEntity(file))).toSeq)
+      case SHCEntities(shcEntities) => Seq(shcEntities)
+      case HWCEntities(hwcEntities) => Seq(hwcEntities)
+      case e =>
+        logWarn(s"Missing unknown leaf node: $e")
+        Seq.empty
+    }
+  }
+
+  private def discoverInputsColumnEntities(
+                                      sparkPlan: SparkPlan,
+                                      executedPlan: SparkPlan): Seq[SACAtlasReferenceable] = {
+    sparkPlan.collectLeaves().flatMap {
+      case h if h.getClass.getName == "org.apache.spark.sql.hive.execution.HiveTableScanExec" =>
+        Try {
+          val method = h.getClass.getMethod("relation")
+          method.setAccessible(true)
+          val relation = method.invoke(h).asInstanceOf[HiveTableRelation]
+          Seq(tableToEntity(relation.tableMeta))
+        }.getOrElse(Seq.empty)
+
+      case f: FileSourceScanExec =>
+        f.tableIdentifier.map(tbl => Seq(prepareEntity(tbl))).getOrElse(
+          f.relation.location.inputFiles.flatMap(file => Seq(external.pathToEntity(file))).toSeq)
+      case SHCEntities(shcEntities) => Seq(shcEntities)
+      case HWCEntities(hwcEntities) => Seq(hwcEntities)
+      case e =>
+        logWarn(s"Missing unknown leaf node: $e")
+        Seq.empty
+    }
+  }
+
+  private def discoverOutputColumnEntities(writer: BatchWrite): Seq[SACAtlasReferenceable] = {
+    writer match {
+      case HWCColumnEntities(hwcColumnEntities) => Seq(hwcColumnEntities)
       case e =>
         logWarn(s"Missing unknown leaf node: $e")
         Seq.empty
@@ -524,6 +600,126 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
           if w.getClass.getMethod("writer").invoke(w)
             .getClass.toString.endsWith(HWCSupport.STREAM_WRITE) =>
         getHWCEntity(w.getClass.getMethod("writer").invoke(w).asInstanceOf[BatchWrite])
+
+      case _ => None
+    }
+
+    // This logic was ported from HWC's `SchemaUtil.getDbTableNames`
+    private def getDbTableNames(db: String, nameStr: String): (String, String) = {
+      val nameParts = nameStr.split("\\.")
+      if (nameParts.length == 1) {
+        // hive.table(<unqualified_tableName>) so fill in db from default session db
+        (db, nameStr)
+      }
+      else if (nameParts.length == 2) {
+        // hive.table(<qualified_tableName>) so use the provided db
+        (nameParts(0), nameParts(1))
+      } else {
+        throw new IllegalArgumentException(
+          "Table name should be specified as either <table> or <db.table>")
+      }
+    }
+  }
+
+
+  object HWCColumnEntities extends Logging {
+    object HWCSupport {
+      val BATCH_READ_SOURCE =
+        "com.hortonworks.spark.sql.hive.llap.HiveWarehouseConnector"
+      val BATCH_WRITE =
+        "com.hortonworks.spark.sql.hive.llap.HiveWarehouseDataSourceWriter"
+      val BATCH_STREAM_WRITE =
+        "com.hortonworks.spark.sql.hive.llap.HiveStreamingDataSourceWriter"
+      val STREAM_WRITE =
+        "com.hortonworks.spark.sql.hive.llap.streaming.HiveStreamingDataSourceWriter"
+
+      def extractFromWriter(
+                             writer: BatchWrite): Option[SACAtlasReferenceable] = writer match {
+        case w: BatchWrite
+          if w.getClass.getCanonicalName.endsWith(BATCH_WRITE) => getHWCColumnEntity(w)
+
+        case w: BatchWrite
+          if w.getClass.getCanonicalName.endsWith(BATCH_STREAM_WRITE) => getHWCColumnEntity(w)
+
+        case w: BatchWrite
+          if w.getClass.getCanonicalName.endsWith(STREAM_WRITE) => getHWCColumnEntity(w)
+
+        case w: BatchWrite
+          if w.getClass.getMethod("writer").invoke(w)
+            .getClass.toString.endsWith(STREAM_WRITE) =>
+          extractFromWriter(
+            w.getClass.getMethod("writer").invoke(w).asInstanceOf[BatchWrite])
+
+        case _ => None
+      }
+    }
+
+    def unapply(plan: LogicalPlan): Option[SACAtlasReferenceable] = plan match {
+      case ds: DataSourceV2Relation
+        if ds.table.getClass.getCanonicalName.endsWith(HWCSupport.BATCH_READ_SOURCE) =>
+        getHWCColumnEntity(ds)
+      case _ => None
+    }
+
+    def unapply(plan: SparkPlan): Option[SACAtlasReferenceable] = plan match {
+      case ds: DataSourceScanExec
+        if ds.relation.getClass.getCanonicalName.endsWith(HWCSupport.BATCH_READ_SOURCE) =>
+        getHWCColumnEntity(ds)
+      case _ => None
+    }
+
+    def unapply(writer: BatchWrite): Option[SACAtlasReferenceable] = {
+      HWCSupport.extractFromWriter(writer)
+    }
+
+    def getHWCColumnEntity(ds: DataSourceV2Relation): Option[SACAtlasReferenceable] = {
+      val db = ds.name
+      val tableName = ds.name
+      Some(external.hiveTableToReference(db, tableName, clusterName))
+    }
+
+    def getHWCColumnEntity(ds: DataSourceScanExec): Option[SACAtlasReferenceable] = {
+      val db = ds.tableIdentifier.map(_.database).getOrElse("default").toString
+      val tableName = ds.tableIdentifier.map(_.table).getOrElse("").toString
+      Some(external.hiveTableToReference(db, tableName, clusterName))
+    }
+
+    def getHWCColumnEntity(r: BatchWrite): Option[SACAtlasReferenceable] = r match {
+      case _ if r.getClass.getCanonicalName.endsWith(HWCSupport.BATCH_WRITE) =>
+        val f = r.getClass.getDeclaredField("options")
+        f.setAccessible(true)
+        val options = f.get(r).asInstanceOf[java.util.Map[String, String]]
+        val (db, tableName) = getDbTableNames(
+          options.getOrDefault("default.db", "default"), options.getOrDefault("table", ""))
+        logDebug("[getHWCEntity] ")
+        Some(external.hiveTableToReference(db, tableName, clusterName))
+
+      case _ if r.getClass.getCanonicalName.endsWith(HWCSupport.BATCH_STREAM_WRITE) =>
+        val dbField = r.getClass.getDeclaredField("db")
+        dbField.setAccessible(true)
+        val db = dbField.get(r).asInstanceOf[String]
+
+        val tableField = r.getClass.getDeclaredField("table")
+        tableField.setAccessible(true)
+        val table = tableField.get(r).asInstanceOf[String]
+
+        Some(external.hiveTableToReference(db, table, clusterName))
+
+      case _ if r.getClass.getCanonicalName.endsWith(HWCSupport.STREAM_WRITE) =>
+        val dbField = r.getClass.getDeclaredField("db")
+        dbField.setAccessible(true)
+        val db = dbField.get(r).asInstanceOf[String]
+
+        val tableField = r.getClass.getDeclaredField("table")
+        tableField.setAccessible(true)
+        val table = tableField.get(r).asInstanceOf[String]
+
+        Some(external.hiveTableToReference(db, table, clusterName))
+
+      case w: MicroBatchWrite
+        if w.getClass.getMethod("writer").invoke(w)
+          .getClass.toString.endsWith(HWCSupport.STREAM_WRITE) =>
+        getHWCColumnEntity(w.getClass.getMethod("writer").invoke(w).asInstanceOf[BatchWrite])
 
       case _ => None
     }
