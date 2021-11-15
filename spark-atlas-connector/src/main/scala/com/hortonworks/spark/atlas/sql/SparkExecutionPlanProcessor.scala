@@ -76,6 +76,7 @@ object ColumnLineage extends Logging {
 
     plan.foreach(p => p match {
       case c: HiveTableRelation =>
+        logDebug(s"[ColumnLineage] findColumns, HiveTableRelation, dataCols: ${c.dataCols}")
         if (!c.dataCols.isEmpty) {
           c.dataCols.foreach(dc => if (parentColumn.equals(dc.name)) {
             // todo
@@ -87,10 +88,12 @@ object ColumnLineage extends Logging {
           })
         }
       case c: Aggregate =>
+        logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
+          s"aggregateExpressions: ${c.aggregateExpressions.toString()}")
         if (!c.aggregateExpressions.isEmpty) {
           for ( ag <- c.aggregateExpressions) {
             val ags = ag.name.split(" AS ")
-            if (ags.length == 2 && ags.last.split("#").head.equals(parentColumn.split("#").head)) {
+            if (ags.length == 2) {
               val reg = "([A-z])+#(\\d)+".r
               column.get.child.++(Some(ColumnLineage(
                 db = "output", table = "output", name = ags.last.split("#").head
@@ -101,13 +104,17 @@ object ColumnLineage extends Logging {
           }
         }
       case c: Project =>
+        logDebug(s"[ColumnLineage] findColumns, Project, " +
+          s"projectList: ${c.projectList}")
         for (p <- c.projectList) {
           val ags = p.name.split(" AS ")
-          if (ags.length == 2 && ags.last.split("#").head.equals(parentColumn.split("#").head)) {
+          if (ags.length == 2) {
             findColumns(c.children, column, ags.head)
           }
         }
       case e =>
+        logDebug(s"[ColumnLineage] findColumns, Other, " +
+          s"e: ${e}")
         if (!e.children.isEmpty) {
           findColumns(e.children, column, parentColumn)
         }

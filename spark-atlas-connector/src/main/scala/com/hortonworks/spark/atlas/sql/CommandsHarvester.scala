@@ -285,13 +285,13 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               s"outputColumns: ${c.outputColumnNames.toString()}, " +
               s"outputColumns: ${c.outputColumns}")
             val columns = Seq.empty[ColumnLineage]
-            for (col <- c.outputColumnNames) {
+            for (col <- c.outputColumns) {
               val column = Some(ColumnLineage(
                 db = SparkUtils.getDatabaseName(c.table),
                 table = SparkUtils.getTableName(c.table),
-                name = col
+                name = col.name
               ))
-              ColumnLineage.findColumns(c.children, column, col)
+              ColumnLineage.findColumns(c.children, column, col.name)
               columns.++(column)
             }
             logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
