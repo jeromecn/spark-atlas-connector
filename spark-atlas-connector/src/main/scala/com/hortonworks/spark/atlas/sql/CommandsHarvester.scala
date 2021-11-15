@@ -244,7 +244,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
   private def makeColumnLineageEntities(qd: QueryDetail): Seq[SACAtlasReferenceable] = {
 
     logDebug(s"[makeColumnLineageEntities] qd: ${qd}")
-    qd.qe.sparkPlan match {
+    qd.qe.executedPlan match {
       case c: CreateHiveTableAsSelectCommand =>
         logDebug(s"[makeColumnLineageEntities] CreateHiveTableAsSelectCommand, " +
           s"outputDb: ${c.tableDesc.database}, " +
