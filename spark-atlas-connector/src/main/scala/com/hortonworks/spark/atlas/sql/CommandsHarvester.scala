@@ -284,9 +284,9 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               s"outputTable: ${SparkUtils.getTableName(c.table)}, " +
               s"outputColumns: ${c.outputColumnNames.toString()}, " +
               s"outputColumns: ${c.outputColumns}")
-            val columns = Seq.empty[ColumnLineage]
+            var columns: Seq[ColumnLineage] = Seq.empty
             for (col <- c.outputColumns) {
-              val column = Some(ColumnLineage(
+              var column = Some(ColumnLineage(
                 db = SparkUtils.getDatabaseName(c.table),
                 table = SparkUtils.getTableName(c.table),
                 name = col.name

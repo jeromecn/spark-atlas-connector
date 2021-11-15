@@ -92,12 +92,14 @@ object ColumnLineage extends Logging {
           s"aggregateExpressions: ${c.aggregateExpressions.toString()}")
         if (!c.aggregateExpressions.isEmpty) {
           for ( ag <- c.aggregateExpressions) {
+            logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
+              s"aggregateExpressionsName: ${ag.name}")
             val ags = ag.name.split(" AS ")
             if (ags.length == 2) {
               val reg = "([A-z])+#(\\d)+".r
-              column.get.child.++(Some(ColumnLineage(
-                db = "output", table = "output", name = ags.last.split("#").head
-              )))
+//              column.get.child.++(Some(ColumnLineage(
+//                db = "output", table = "output", name = ags.last.split("#").head
+//              )))
               reg.findAllMatchIn(ags.head).foreach(oriCol =>
                 findColumns(c.children, column, oriCol.group(1)))
             }
