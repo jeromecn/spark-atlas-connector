@@ -95,7 +95,8 @@ object ColumnLineage extends Logging {
             logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
               s"name: ${ag.name}, " +
               s"qualifiedName: ${ag.qualifiedName}, " +
-              s"sql: ${ag.sql}, ")
+              s"sql: ${ag.sql}")
+            ag.children.foreach(agc => logDebug(agc.toJSON))
             val ags = ag.sql.split(" AS ")
             if (ags.length == 2) {
               val reg = "([A-z])+#(\\d)+".r
