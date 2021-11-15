@@ -94,8 +94,9 @@ object ColumnLineage extends Logging {
           for ( ag <- c.aggregateExpressions) {
             logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
               s"name: ${ag.name}, " +
-              s"qualifiedName: ${ag.qualifiedName}")
-            val ags = ag.qualifiedName.split(" AS ")
+              s"qualifiedName: ${ag.qualifiedName}, " +
+              s"sql: ${ag.sql}, ")
+            val ags = ag.sql.split(" AS ")
             if (ags.length == 2) {
               val reg = "([A-z])+#(\\d)+".r
 //              column.get.child.++(Some(ColumnLineage(
