@@ -56,7 +56,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       // new table entity
       val outputEntities = Seq(tableToEntity(node.table))
 
-      makeProcessEntities(inputEntities, outputEntities, qd)
+      makeProcessEntities(inputEntities, outputEntities, qd) ++ makeColumnLineageEntities(qd)
     }
   }
 
@@ -71,7 +71,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       val outputEntities = Seq(node.catalogTable.map(tableToEntity(_)).getOrElse(
         external.pathToEntity(node.outputPath.toUri.toString)))
 
-      makeProcessEntities(inputEntities, outputEntities, qd)
+      makeProcessEntities(inputEntities, outputEntities, qd) ++ makeColumnLineageEntities(qd)
     }
   }
 
@@ -85,7 +85,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       // new table entity
       val outputEntities = Seq(tableToEntity(node.tableDesc.copy(owner = SparkUtils.currUser())))
 
-      makeProcessEntities(inputEntities, outputEntities, qd)
+      makeProcessEntities(inputEntities, outputEntities, qd) ++ makeColumnLineageEntities(qd)
     }
   }
 
@@ -93,7 +93,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
     override def harvest(
         node: CreateTableCommand,
         qd: QueryDetail): Seq[SACAtlasReferenceable] = {
-      Seq(tableToEntity(node.table))
+      Seq(tableToEntity(node.table)) ++ makeColumnLineageEntities(qd)
     }
   }
 
@@ -105,7 +105,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       val inputEntities = discoverInputsEntities(node.query, qd.qe.executedPlan)
       val outputEntities = Seq(tableToEntity(node.table))
 
-      makeProcessEntities(inputEntities, outputEntities, qd)
+      makeProcessEntities(inputEntities, outputEntities, qd) ++ makeColumnLineageEntities(qd)
     }
   }
 
@@ -116,7 +116,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       val inputEntities = Seq(external.pathToEntity(node.path))
       val outputEntities = Seq(prepareEntity(node.table))
 
-      makeProcessEntities(inputEntities, outputEntities, qd)
+      makeProcessEntities(inputEntities, outputEntities, qd) ++ makeColumnLineageEntities(qd)
     }
   }
 
@@ -131,7 +131,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       val inputEntities = discoverInputsEntities(qd.qe.sparkPlan, qd.qe.executedPlan)
       val outputEntities = Seq(external.pathToEntity(node.storage.locationUri.get.toString))
 
-      makeProcessEntities(inputEntities, outputEntities, qd)
+      makeProcessEntities(inputEntities, outputEntities, qd) ++ makeColumnLineageEntities(qd)
     }
   }
 
@@ -153,7 +153,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       val viewIdentifier = node.name
       val outputEntities = Seq(prepareEntity(viewIdentifier))
 
-      makeProcessEntities(inputEntities, outputEntities, qd)
+      makeProcessEntities(inputEntities, outputEntities, qd) ++ makeColumnLineageEntities(qd)
     }
   }
 
@@ -162,7 +162,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
         node: CreateDataSourceTableCommand,
         qd: QueryDetail): Seq[SACAtlasReferenceable] = {
       // only have table entities
-      Seq(tableToEntity(node.table))
+      Seq(tableToEntity(node.table)) ++ makeColumnLineageEntities(qd)
     }
   }
 
@@ -181,7 +181,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
           Seq.empty
       }
 
-      makeProcessEntities(inputEntities, outputEntities, qd)
+      makeProcessEntities(inputEntities, outputEntities, qd) ++ makeColumnLineageEntities(qd)
     }
   }
 
@@ -198,7 +198,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
         case w => discoverOutputEntities(w)
       }
 
-      makeProcessEntities(inputEntities, outputEntities, qd)
+      makeProcessEntities(inputEntities, outputEntities, qd) ++ makeColumnLineageEntities(qd)
     }
   }
 
@@ -239,6 +239,24 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       // create process entity
       Seq(internal.etlProcessToEntity(inputsEntities, cleanedOutput, logMap))
     }
+  }
+
+  private def makeColumnLineageEntities(qd: QueryDetail): Seq[SACAtlasReferenceable] = {
+
+    qd.qe.sparkPlan match {
+      case c: CreateHiveTableAsSelectCommand =>
+        logDebug(s"[makeColumnLineageEntities] CreateHiveTableAsSelectCommand, " +
+          s"outputDb: ${c.tableDesc.database}, " +
+          s"outputTable: ${c.tableDesc}, " +
+          s"outputColumns: ${c.outputColumnNames.toString()}, ")
+      case c: InsertIntoHiveTable =>
+        logDebug(s"[makeColumnLineageEntities] InsertIntoHiveTable, " +
+          s"outputDb: ${c.table.database}, " +
+          s"outputTable: ${c.table.toString()}, " +
+          s"outputColumns: ${c.outputColumnNames.toString()}, ")
+    }
+
+    Seq.empty
   }
 
   private def discoverInputsEntities(

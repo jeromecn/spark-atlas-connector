@@ -17,6 +17,7 @@
 
 package com.hortonworks.spark.atlas.types
 
+import com.hortonworks.spark.atlas.sql.QueryDetail
 import com.hortonworks.spark.atlas.types.external.{HIVE_TABLE_TYPE_STRING, hiveTableUniqueAttribute}
 import com.hortonworks.spark.atlas.types.internal.sparkTableToReference
 
@@ -228,6 +229,35 @@ object internal extends Logging {
     logMap.foreach { case (k, v) => entity.setAttribute(k, v)}
 
     new SACAtlasEntityWithDependencies(entity, inputs ++ outputs)
+  }
+
+  def etlProcessLineage(inputs: Seq[SACAtlasReferenceable],
+                        outputs: Seq[SACAtlasReferenceable],
+                        qd: QueryDetail): SACAtlasEntityWithDependencies = {
+    val entity = new AtlasEntity(metadata.HIVE_COLUMN_LINEAGE)
+
+    val appId = SparkUtils.sparkSession.sparkContext.applicationId
+    val appName = SparkUtils.sparkSession.sparkContext.appName match {
+      case "Spark shell" => s"Spark Job + $appId"
+      case default => default + s" $appId"
+    }
+
+    entity.setAttribute("qualifiedName", appId)
+    entity.setAttribute("name", appName)
+
+    val inputObjIds = inputs.map(_.asObjectId).asJava
+    val outputObjIds = outputs.map(_.asObjectId).asJava
+
+    entity.setAttribute("inputs", inputObjIds)  // Dataset and Model entity
+    entity.setAttribute("outputs", outputObjIds)  // Dataset entity
+
+    val query = SACAtlasEntityReference(new AtlasObjectId(metadata.PROCESS_TYPE_STRING,
+      "qualifiedName",
+      appName))
+    entity.setAttribute("query", query)
+
+    new SACAtlasEntityWithDependencies(entity, inputs ++ outputs)
+
   }
 
   def updateMLProcessToEntity(

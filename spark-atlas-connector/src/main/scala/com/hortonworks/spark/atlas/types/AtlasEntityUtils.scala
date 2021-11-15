@@ -57,14 +57,14 @@ trait AtlasEntityUtils extends Logging {
   def tableToEntity(
       tableDefinition: CatalogTable,
       mockDbDefinition: Option[CatalogDatabase] = None): SACAtlasReferenceable = {
-    internal.sparkTableToEntity(tableDefinition, clusterName, mockDbDefinition)
-//    if (SparkUtils.usingRemoteMetastoreService()) {
-//      logDebug("[tableToEntity] external.hiveTableToReference")
-//      external.hiveTableToReference(tableDefinition, clusterName, mockDbDefinition)
-//    } else {
-//      logDebug("[tableToEntity] internal.sparkTableToEntity")
-//      internal.sparkTableToEntity(tableDefinition, clusterName, mockDbDefinition)
-//    }
+//    internal.sparkTableToEntity(tableDefinition, clusterName, mockDbDefinition)
+    if (SparkUtils.usingRemoteMetastoreService()) {
+      logDebug("[tableToEntity] external.hiveTableToReference")
+      external.hiveTableToReference(tableDefinition, clusterName, mockDbDefinition)
+    } else {
+      logDebug("[tableToEntity] internal.sparkTableToEntity")
+      internal.sparkTableToEntity(tableDefinition, clusterName, mockDbDefinition)
+    }
   }
 
   def sparkTableToEntity(
