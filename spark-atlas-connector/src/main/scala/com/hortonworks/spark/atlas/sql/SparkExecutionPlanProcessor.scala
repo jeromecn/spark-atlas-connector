@@ -112,6 +112,8 @@ object ColumnLineage extends Logging {
                   logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${alias}, " +
                     s"attr: ${ch.name}")
                   attr.++(ch.name)
+                case e =>
+                  logDebug(e)
               }
             }
 
