@@ -244,17 +244,20 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
   private def makeColumnLineageEntities(qd: QueryDetail): Seq[SACAtlasReferenceable] = {
 
     logDebug(s"[makeColumnLineageEntities] qd: ${qd}")
-    qd.qe.executedPlan match {
-      case c: CreateHiveTableAsSelectCommand =>
-        logDebug(s"[makeColumnLineageEntities] CreateHiveTableAsSelectCommand, " +
-          s"outputDb: ${c.tableDesc.database}, " +
-          s"outputTable: ${c.tableDesc}, " +
-          s"outputColumns: ${c.outputColumnNames.toString()}, ")
-      case c: InsertIntoHiveTable =>
-        logDebug(s"[makeColumnLineageEntities] InsertIntoHiveTable, " +
-          s"outputDb: ${c.table.database}, " +
-          s"outputTable: ${c.table.toString()}, " +
-          s"outputColumns: ${c.outputColumnNames.toString()}, ")
+    qd.qe.sparkPlan match {
+      case s: ExecutedCommandExec =>
+        s.cmd match {
+          case c: CreateHiveTableAsSelectCommand =>
+            logDebug(s"[makeColumnLineageEntities] CreateHiveTableAsSelectCommand, " +
+              s"outputDb: ${c.tableDesc.database}, " +
+              s"outputTable: ${c.tableDesc}, " +
+              s"outputColumns: ${c.outputColumnNames.toString()}, ")
+          case c: InsertIntoHiveTable =>
+            logDebug(s"[makeColumnLineageEntities] InsertIntoHiveTable, " +
+              s"outputDb: ${c.table.database}, " +
+              s"outputTable: ${c.table.toString()}, " +
+              s"outputColumns: ${c.outputColumnNames.toString()}, ")
+        }
     }
 
     Seq.empty
