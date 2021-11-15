@@ -36,6 +36,7 @@ import org.apache.atlas.model.instance.AtlasObjectId
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.PersistedView
 import org.apache.spark.sql.catalyst.catalog.HiveTableRelation
+import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project}
 import org.apache.spark.sql.connector.write.{DataWriterFactory, PhysicalWriteInfo, WriterCommitMessage}
@@ -76,7 +77,9 @@ object ColumnLineage extends Logging {
 
     plan.foreach(p => p match {
       case c: HiveTableRelation =>
-        logDebug(s"[ColumnLineage] findColumns, HiveTableRelation, dataCols: ${c.dataCols}")
+        logDebug(s"[ColumnLineage] findColumns, HiveTableRelation, " +
+          s"dataCols: ${c.dataCols}, " +
+          s"json:${c.toJSON}")
         if (!c.dataCols.isEmpty) {
           c.dataCols.foreach(dc => if (parentColumn.equals(dc.name)) {
             // todo
@@ -97,21 +100,32 @@ object ColumnLineage extends Logging {
               s"qualifiedName: ${ag.qualifiedName}, " +
               s"sql: ${ag.sql}, " +
               s"json: ${ag.toJSON}")
-            ag.children.foreach(agc => logDebug(agc.toJSON))
-            val ags = ag.sql.split(" AS ")
-            if (ags.length == 2) {
-              val reg = "([A-z])+#(\\d)+".r
-//              column.get.child.++(Some(ColumnLineage(
-//                db = "output", table = "output", name = ags.last.split("#").head
-//              )))
-              reg.findAllMatchIn(ags.head).foreach(oriCol =>
-                findColumns(c.children, column, oriCol.group(1)))
+
+            var alias: String = ""
+            var attr: Seq[String] = Seq.empty[String]
+            for (child <- ag.children) {
+              child match {
+                case ch: org.apache.spark.sql.catalyst.expressions.Alias =>
+                  logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${ch.name}")
+                  alias = ch.name
+                case ch: org.apache.spark.sql.catalyst.expressions.AttributeReference =>
+                  logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${alias}, " +
+                    s"attr: ${ch.name}")
+                  attr.++(ch.name)
+              }
+            }
+
+            if (alias.equals(parentColumn)) {
+              for (ac <- attr) {
+                findColumns(c.children, column, ac)
+              }
             }
           }
         }
       case c: Project =>
         logDebug(s"[ColumnLineage] findColumns, Project, " +
-          s"projectList: ${c.projectList}")
+          s"projectList: ${c.projectList}, " +
+          s"json: ${c.toJSON}")
         for (p <- c.projectList) {
           val ags = p.name.split(" AS ")
           if (ags.length == 2) {
