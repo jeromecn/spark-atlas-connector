@@ -271,9 +271,10 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
           case c: InsertIntoHiveTable =>
             logDebug(s"[makeColumnLineageEntities] [DataWritingCommandExec] " +
               s"InsertIntoHiveTable, " +
-              s"outputDb: ${c.table.database}, " +
-              s"outputTable: ${c.table.toString()}, " +
-              s"outputColumns: ${c.outputColumnNames.toString()}, ")
+              s"outputDb: ${SparkUtils.getDatabaseName(c.table)}, " +
+              s"outputTable: ${SparkUtils.getTableName(c.table)}, " +
+              s"outputColumns: ${c.outputColumnNames.toString()}, " +
+              s"outputColumns: ${c.outputColumns}")
         }
     }
 
