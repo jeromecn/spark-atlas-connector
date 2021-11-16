@@ -118,7 +118,7 @@ object ColumnLineage extends Logging {
             if (aliasColumn.name.eq(parentColumn)
               && aliasColumn.nameIndex.equals(parentColumnIndex)) {
               attrs.foreach(sub =>
-                  findColumns(c.children, sub.name, sub.nameIndex)
+                columns = columns.++(findColumns(c.children, sub.name, sub.nameIndex))
               )
             }
 
@@ -134,7 +134,7 @@ object ColumnLineage extends Logging {
           if (p.name.equals(parentColumn) && p.exprId.id.equals(parentColumnIndex)) {
             val subColumns: Seq[ColumnLineage] = findAggregateColumn(p.children)
             subColumns.foreach(sub =>
-                findColumns(c.children, sub.name, sub.nameIndex)
+              columns = columns.++(findColumns(c.children, sub.name, sub.nameIndex))
             )
           }
         }
@@ -142,7 +142,7 @@ object ColumnLineage extends Logging {
         logDebug(s"[ColumnLineage] findColumns, Other, " +
           s"e: ${e}")
         if (!e.children.isEmpty) {
-          findColumns(e.children, parentColumn, parentColumnIndex)
+          columns = columns.++(findColumns(e.children, parentColumn, parentColumnIndex))
         }
     })
 
