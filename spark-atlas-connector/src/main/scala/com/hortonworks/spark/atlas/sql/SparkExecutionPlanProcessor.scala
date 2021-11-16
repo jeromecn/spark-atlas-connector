@@ -60,17 +60,28 @@ object ColumnLineage extends Logging {
   def findAggregateColumn(expressions: Seq[Expression]): Seq[ColumnLineage] = {
     logDebug(s"[ColumnLineage] findAggregateColumn, expressions: ${expressions.size}")
 
-    var columns: Seq[ColumnLineage] = expressions.flatMap(e => e match {
+    var columns: Seq[ColumnLineage] = Seq.empty
+
+    expressions.foreach(ep => ep match {
       case ch: AttributeReference =>
-        Option(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id))
+        columns = columns.++(Some(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)))
       case e =>
         if (!e.children.isEmpty) {
-          findAggregateColumn(e.children)
+          columns = columns.++(findAggregateColumn(e.children))
         }
-        None
     })
+
+//    var columns: Seq[ColumnLineage] = expressions.flatMap(e => e match {
+//      case ch: AttributeReference =>
+//        Option(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id))
+//      case e =>
+//        if (!e.children.isEmpty) {
+//          findAggregateColumn(e.children)
+//        }
+//        None
+//    })
     logDebug(s"[ColumnLineage] findAggregateColumn, expressions: ${expressions.size}, " +
-      s"columns: ${columns.size}")
+      s"columns: ${columns.size}, col: ${columns}")
     columns
   }
   def findColumns(plan: Seq[LogicalPlan],
