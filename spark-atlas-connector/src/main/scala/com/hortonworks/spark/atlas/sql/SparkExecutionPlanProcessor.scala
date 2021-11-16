@@ -56,22 +56,20 @@ case class ColumnLineage(
     child: Seq[ColumnLineage] = Seq.empty[ColumnLineage])
 
 object ColumnLineage extends Logging {
-//  def fromQueryExecutionListener(Seq[LogicalPlan], cols: Seq[String]): Seq[ColumnLineage] = {
-//    val columns = Seq.empty[ColumnLineage]
-//
-//    for (c <- qe.optimizedPlan.children) {
-//      val column = Some(ColumnLineage(name = ???, child = ???))
-//      findColumns(c.children, column, "")
-//      columns.++(column)
-//    }
-//
-//    for (c <- cols) {
-//
-//    }
-//
-//    columns
-//  }
 
+  def findAggregateColumn(expressions: Seq[Expression], columns: Seq[ColumnLineage]): Unit = {
+    logDebug(s"[ColumnLineage] findAggregateColumn, expressions: ${expressions.size}")
+    expressions.foreach(exp => exp match {
+      case ch: org.apache.spark.sql.catalyst.expressions.AttributeReference =>
+        if (ch.children.isEmpty) {
+          columns.++(Some(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)))
+        }
+      case e =>
+        if (!e.children.isEmpty) {
+          findAggregateColumn(e.children, columns)
+        }
+    })
+  }
   def findColumns(plan: Seq[LogicalPlan],
                   column: Option[ColumnLineage],
                   parentColumn: String,
@@ -100,57 +98,35 @@ object ColumnLineage extends Logging {
           s"childJson: ${c.child.toJSON}, ")
 
 
-        var alias: String = ""
-        var aliasIndex: Long = 0L
+        var alias: Seq[ColumnLineage] = Seq.empty
         var attr: Seq[ColumnLineage] = Seq.empty[ColumnLineage]
+
         c.aggregateExpressions.foreach(ag => ag match {
           case ch: org.apache.spark.sql.catalyst.expressions.Alias =>
             logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${ch.name}")
-            alias = ch.name
-            aliasIndex = ch.exprId.id
+            var attrs: Seq[ColumnLineage] = Seq.empty[ColumnLineage]
+            findAggregateColumn(ch.children, attrs)
+            val aliasColumn = ColumnLineage(name = ch.name, nameIndex = ch.exprId.id, child = attrs)
+            alias.++(Some(aliasColumn))
 
-            ch.children.foreach(a => logDebug(s"[ColumnLineage] findColumns, " +
-              s"sAggregate, child, child, " +
-              s"a:${a.getClass.getName}"))
-
-          case ch: org.apache.spark.sql.catalyst.expressions.AttributeReference =>
-            logDebug(s"[ColumnLineage] findColumns, Aggregate, child, refer: ${ch.name}, " +
-              s"attr: ${ch.name}")
-            attr.++(Some(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)))
+            logDebug(s"[ColumnLineage] findColumns, Aggregate, child, " +
+              s"alias: ${aliasColumn.name}, " +
+              s"aliasindex: ${aliasColumn.nameIndex}, " +
+              s"attrs: ${aliasColumn.child}")
           case e =>
             logDebug("[ColumnLineage] findColumns, Aggregate, aggregateExpressions, child, " +
               s"case e: ${e}")
         })
-//          for ( ag <- c.aggregateExpressions) {
-//            logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
-//              s"sql: ${ag.sql}, " +
-//              s"json: ${ag.toJSON}, " +
-//              s"childSize: ${ag.children.length}")
-//
-//            ag match {
-//              case ch: org.apache.spark.sql.catalyst.expressions.Alias =>
-//                logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${ch.name}")
-//                alias = ch.name
-//                aliasIndex = ch.exprId.id
-//              case ch: org.apache.spark.sql.catalyst.expressions.AttributeReference =>
-//                logDebug(s"[ColumnLineage] findColumns, Aggregate, child, refer: ${ch.name}, " +
-//                  s"attr: ${ch.name}")
-//                attr.++(Some(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)))
-//              case e =>
-//                logDebug("[ColumnLineage] findColumns, Aggregate, aggregateExpressions, child, " +
-//                  s"case e: ${e}")
-//            }
-//          }
 
-        logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
-          s"alias: ${alias}, parentColumn: ${parentColumn}, " +
-          s"aliasIndex: ${aliasIndex}, parentColumnIndex: ${parentColumnIndex}, " +
-          s"attr: ${attr}")
-        if (alias.equals(parentColumn) && aliasIndex == parentColumnIndex) {
-          for (ac <- attr) {
-            findColumns(c.children, column, ac.name, ac.nameIndex)
-          }
-        }
+//        logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
+//          s"alias: ${alias}, parentColumn: ${parentColumn}, " +
+//          s"aliasIndex: ${aliasIndex}, parentColumnIndex: ${parentColumnIndex}, " +
+//          s"attr: ${attr}")
+//        if (alias.equals(parentColumn) && aliasIndex == parentColumnIndex) {
+//          for (ac <- attr) {
+//            findColumns(c.children, column, ac.name, ac.nameIndex)
+//          }
+//        }
       case c: Project =>
         logDebug(s"[ColumnLineage] findColumns, Project, " +
           s"projectList: ${c.projectList}, " +
