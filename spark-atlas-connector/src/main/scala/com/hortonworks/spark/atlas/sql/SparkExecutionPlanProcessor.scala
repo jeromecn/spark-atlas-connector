@@ -94,26 +94,27 @@ object ColumnLineage extends Logging {
         }
       case c: Aggregate =>
         logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
-          s"aggregateExpressions: ${c.aggregateExpressions.size}")
+          s"aggregateExpressions: ${c.aggregateExpressions.size}, " +
+          s"expressions: ${c.expressions.size}, " +
+          s"children: ${c.children.size}, ")
 
         var alias: String = ""
         var aliasIndex: Long = 0L
         var attr: Seq[ColumnLineage] = Seq.empty[ColumnLineage]
 
-        if (!c.aggregateExpressions.isEmpty) {
-          c.aggregateExpressions.foreach(ag => ag match {
-            case ch: org.apache.spark.sql.catalyst.expressions.Alias =>
-              logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${ch.name}")
-              alias = ch.name
-              aliasIndex = ch.exprId.id
-            case ch: org.apache.spark.sql.catalyst.expressions.AttributeReference =>
-              logDebug(s"[ColumnLineage] findColumns, Aggregate, child, refer: ${ch.name}, " +
-                s"attr: ${ch.name}")
-              attr.++(Some(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)))
-            case e =>
-              logDebug("[ColumnLineage] findColumns, Aggregate, aggregateExpressions, child, " +
-                s"case e: ${e}")
-          })
+        c.aggregateExpressions.foreach(ag => ag match {
+          case ch: org.apache.spark.sql.catalyst.expressions.Alias =>
+            logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${ch.name}")
+            alias = ch.name
+            aliasIndex = ch.exprId.id
+          case ch: org.apache.spark.sql.catalyst.expressions.AttributeReference =>
+            logDebug(s"[ColumnLineage] findColumns, Aggregate, child, refer: ${ch.name}, " +
+              s"attr: ${ch.name}")
+            attr.++(Some(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)))
+          case e =>
+            logDebug("[ColumnLineage] findColumns, Aggregate, aggregateExpressions, child, " +
+              s"case e: ${e}")
+        })
 //          for ( ag <- c.aggregateExpressions) {
 //            logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
 //              s"sql: ${ag.sql}, " +
@@ -134,7 +135,7 @@ object ColumnLineage extends Logging {
 //                  s"case e: ${e}")
 //            }
 //          }
-        }
+
         logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
           s"alias: ${alias}, parentColumn: ${parentColumn}, " +
           s"aliasIndex: ${aliasIndex}, parentColumnIndex: ${parentColumnIndex}, " +
