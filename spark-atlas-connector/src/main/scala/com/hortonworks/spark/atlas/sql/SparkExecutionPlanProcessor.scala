@@ -96,12 +96,15 @@ object ColumnLineage extends Logging {
         logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
           s"aggregateExpressions: ${c.aggregateExpressions.size}, " +
           s"expressions: ${c.expressions.size}, " +
-          s"children: ${c.children.size}, ")
+          s"children: ${c.children.size}, " +
+          s"childJson: ${c.child.toJSON}, ")
+
+        c.child.constraints.iterator.foreach(a =>
+          logDebug(s"[ColumnLineage] findColumns, Aggregate, constraints, ${a.getClass.getName}"))
 
         var alias: String = ""
         var aliasIndex: Long = 0L
         var attr: Seq[ColumnLineage] = Seq.empty[ColumnLineage]
-
         c.aggregateExpressions.foreach(ag => ag match {
           case ch: org.apache.spark.sql.catalyst.expressions.Alias =>
             logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${ch.name}")
