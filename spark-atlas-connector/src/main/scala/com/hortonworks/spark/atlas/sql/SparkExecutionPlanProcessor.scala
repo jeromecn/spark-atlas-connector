@@ -101,9 +101,7 @@ object ColumnLineage extends Logging {
           s"expressions: ${c.expressions.length}, " +
           s"children: ${c.children.length}, ")
 
-
         var alias: Seq[ColumnLineage] = Seq.empty
-        var attr: Seq[ColumnLineage] = Seq.empty[ColumnLineage]
 
         c.aggregateExpressions.foreach(ag => ag match {
           case ch: org.apache.spark.sql.catalyst.expressions.Alias =>
@@ -120,8 +118,7 @@ object ColumnLineage extends Logging {
             if (aliasColumn.name.eq(parentColumn)
               && aliasColumn.nameIndex.equals(parentColumnIndex)) {
               attrs.foreach(sub =>
-                columns = columns.++(
-                  findColumns(c.children, sub.name, sub.nameIndex))
+                  findColumns(c.children, sub.name, sub.nameIndex)
               )
             }
 
@@ -137,8 +134,7 @@ object ColumnLineage extends Logging {
           if (p.name.equals(parentColumn) && p.exprId.id.equals(parentColumnIndex)) {
             val subColumns: Seq[ColumnLineage] = findAggregateColumn(p.children)
             subColumns.foreach(sub =>
-              columns = columns.++(
-                findColumns(c.children, sub.name, sub.nameIndex))
+                findColumns(c.children, sub.name, sub.nameIndex)
             )
           }
         }

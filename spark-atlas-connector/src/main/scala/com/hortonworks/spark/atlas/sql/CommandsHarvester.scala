@@ -286,16 +286,21 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               s"outputColumns: ${c.outputColumns}")
             var columns: Seq[ColumnLineage] = Seq.empty
             for (col <- c.outputColumns) {
-              var column = Some(ColumnLineage(
+
+              var subColumns: Seq[ColumnLineage] = ColumnLineage.findColumns(
+                c.children, col.name, col.exprId.id)
+              val column = Some(ColumnLineage(
                 db = SparkUtils.getDatabaseName(c.table),
                 table = SparkUtils.getTableName(c.table),
-                name = col.name
+                name = col.name,
+                child = subColumns
               ))
-              ColumnLineage.findColumns(c.children, col.name, col.exprId.id)
-              columns.++(column)
+              columns = columns.++(column)
+              logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+                s"col: ${col.name}, " +
+                s"colIndex: ${col.exprId.id}, " +
+                s"columnsTree: ${columns}")
             }
-            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
-              s"columnsTree: ${columns}")
           case c: InsertIntoHadoopFsRelationCommand =>
             logDebug("")
           case c: CreateDataSourceTableAsSelectCommand =>
