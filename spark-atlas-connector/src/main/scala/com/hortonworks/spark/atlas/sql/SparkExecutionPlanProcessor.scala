@@ -93,14 +93,15 @@ object ColumnLineage extends Logging {
       case c: Aggregate =>
         logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
           s"aggregateExpressions: ${c.aggregateExpressions.toString()}")
-        if (!c.aggregateExpressions.isEmpty) {
-          for ( ag <- c.aggregateExpressions) {
+        c.expressions
+        if (!c.expressions.isEmpty) {
+          for ( ag <- c.expressions) {
             logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
-              s"name: ${ag.name}, " +
-              s"qualifiedName: ${ag.qualifiedName}, " +
               s"sql: ${ag.sql}, " +
               s"json: ${ag.toJSON}, " +
               s"childSize: ${ag.children.length}")
+
+
 
             var alias: String = ""
             var attr: Seq[String] = Seq.empty[String]
