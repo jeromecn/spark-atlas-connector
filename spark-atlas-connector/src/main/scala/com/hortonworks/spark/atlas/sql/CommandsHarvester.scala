@@ -299,7 +299,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
                 s"col: ${col.name}, " +
                 s"colIndex: ${col.exprId.id}, " +
-                s"columnsTree: ${columns}")
+                s"columnsTree: ${subColumns}")
             }
           case c: InsertIntoHadoopFsRelationCommand =>
             logDebug("")
