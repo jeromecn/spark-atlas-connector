@@ -57,8 +57,9 @@ case class ColumnLineage(
 
 object ColumnLineage extends Logging {
 
-  def findAggregateColumn(expressions: Seq[Expression], columns: Seq[ColumnLineage]): Unit = {
+  def findAggregateColumn(expressions: Seq[Expression]): Seq[ColumnLineage] = {
     logDebug(s"[ColumnLineage] findAggregateColumn, expressions: ${expressions.size}")
+    var columns: Seq[ColumnLineage] = Seq.empty
     expressions.foreach(exp => exp match {
       case ch: org.apache.spark.sql.catalyst.expressions.AttributeReference =>
         columns:+ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)
@@ -66,9 +67,11 @@ object ColumnLineage extends Logging {
           s"columns: ${columns.size}")
       case e =>
         if (!e.children.isEmpty) {
-          findAggregateColumn(e.children, columns)
+          findAggregateColumn(e.children)
         }
     })
+
+    columns
   }
   def findColumns(plan: Seq[LogicalPlan],
                   column: Option[ColumnLineage],
@@ -94,8 +97,7 @@ object ColumnLineage extends Logging {
         logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
           s"aggregateExpressions: ${c.aggregateExpressions.length}, " +
           s"expressions: ${c.expressions.length}, " +
-          s"children: ${c.children.length}, " +
-          s"childJson: ${c.child.toJSON}, ")
+          s"children: ${c.children.length}, ")
 
 
         var alias: Seq[ColumnLineage] = Seq.empty
@@ -104,8 +106,7 @@ object ColumnLineage extends Logging {
         c.aggregateExpressions.foreach(ag => ag match {
           case ch: org.apache.spark.sql.catalyst.expressions.Alias =>
             logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${ch.name}")
-            var attrs: Seq[ColumnLineage] = Seq.empty[ColumnLineage]
-            findAggregateColumn(ch.children, attrs)
+            var attrs: Seq[ColumnLineage] = findAggregateColumn(ch.children)
             val aliasColumn = ColumnLineage(name = ch.name, nameIndex = ch.exprId.id, child = attrs)
             alias.++(Some(aliasColumn))
 
