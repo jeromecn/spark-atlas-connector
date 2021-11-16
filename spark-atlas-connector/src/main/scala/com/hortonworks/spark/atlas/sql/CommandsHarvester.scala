@@ -291,7 +291,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
                 table = SparkUtils.getTableName(c.table),
                 name = col.name
               ))
-              ColumnLineage.findColumns(c.children, column, col.name, col.exprId.id)
+              ColumnLineage.findColumns(c.children, col.name, col.exprId.id)
               columns.++(column)
             }
             logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
