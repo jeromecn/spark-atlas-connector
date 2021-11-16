@@ -53,6 +53,7 @@ case class ColumnLineage(
     table: String = "",
     name: String = "",
     nameIndex: Long = 0L,
+    owner: String = "",
     child: Set[ColumnLineage] = Set.empty[ColumnLineage])
 
 object ColumnLineage extends Logging {
@@ -91,7 +92,8 @@ object ColumnLineage extends Logging {
                 db = SparkUtils.getDatabaseName(c.tableMeta.identifier),
                 table = SparkUtils.getTableName(c.tableMeta.identifier),
                 name = cd.name,
-                nameIndex = cd.nameIndex
+                nameIndex = cd.nameIndex,
+                owner = c.tableMeta.owner
               )))
             }
           )

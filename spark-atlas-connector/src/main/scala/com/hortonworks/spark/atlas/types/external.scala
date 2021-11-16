@@ -19,7 +19,7 @@ package com.hortonworks.spark.atlas.types
 
 import java.io.File
 import java.net.{URI, URISyntaxException}
-import com.hortonworks.spark.atlas.sql.{KafkaTopicInformation, QueryDetail}
+import com.hortonworks.spark.atlas.sql.{ColumnLineage, KafkaTopicInformation, QueryDetail}
 import org.apache.atlas.AtlasConstants
 import org.apache.atlas.model.instance.{AtlasEntity, AtlasObjectId}
 import org.apache.commons.lang.RandomStringUtils
@@ -31,6 +31,7 @@ import com.hortonworks.spark.atlas.utils.{JdbcUtils, SparkUtils}
 import org.apache.spark.sql.SparkSession
 
 import javax.management.Query
+import scala.jdk.CollectionConverters.asJavaIterableConverter
 
 
 object external {
@@ -230,7 +231,7 @@ object external {
 
   // ================== Hive Catalog entities =====================
   val HIVE_TABLE_TYPE_STRING = "hive_table"
-  val HIVE_COLUMN_TYPE_STR4ING = "hive_column"
+  val HIVE_COLUMN_TYPE_STRING = "hive_column"
 
   // scalastyle:off
   /**
@@ -273,5 +274,49 @@ object external {
     val qualifiedName = hiveTableUniqueAttribute(cluster, db, table)
     SACAtlasEntityReference(
       new AtlasObjectId(HIVE_TABLE_TYPE_STRING, "qualifiedName", qualifiedName))
+  }
+
+  def hiveColumnLineageToReference(
+      qd: QueryDetail,
+      columns: Seq[ColumnLineage]): Seq[SACAtlasReferenceable] = {
+
+    columns.flatMap(col => {
+
+      val entity = new AtlasEntity(metadata.HIVE_COLUMN_LINEAGE)
+
+      val appId = SparkUtils.sparkSession.sparkContext.applicationId
+      val appName = SparkUtils.sparkSession.sparkContext.appName match {
+        case "Spark shell" => s"Spark Job + $appId"
+        case default => default + s" $appId"
+      }
+
+      entity.setAttribute("qualifiedName", appId)
+      entity.setAttribute("name", appName)
+
+      val outputs = Option(SACAtlasEntityReference(
+        new AtlasObjectId(HIVE_COLUMN_TYPE_STRING, "qualifiedName",
+          s"${col.db}.${col.table}.${col.name}@${col.owner}"))).toSeq
+
+      val inputs = col.child.flatMap(c => {
+        Some(SACAtlasEntityReference(
+          new AtlasObjectId(HIVE_COLUMN_TYPE_STRING, "qualifiedName",
+            s"${c.db}.${c.table}.${c.name}@${c.owner}")
+        ))
+      }).toSeq
+
+      val inputObjIds = inputs.map(_.asObjectId).asJava
+      val outputObjIds = outputs.map(_.asObjectId).asJava
+
+      entity.setAttribute("inputs", inputObjIds)  // Dataset and Model entity
+      entity.setAttribute("outputs", outputObjIds)  // Dataset entity
+
+      val query = SACAtlasEntityReference(new AtlasObjectId(metadata.PROCESS_TYPE_STRING,
+        "qualifiedName",
+        appName))
+      entity.setAttribute("query", query)
+
+      Some(new SACAtlasEntityWithDependencies(entity, inputs ++ outputs))
+    })
+
   }
 }

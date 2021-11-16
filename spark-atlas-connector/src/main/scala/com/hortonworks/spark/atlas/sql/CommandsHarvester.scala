@@ -242,6 +242,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
   }
 
   private def makeColumnLineageEntities(qd: QueryDetail): Seq[SACAtlasReferenceable] = {
+    var columns: Seq[ColumnLineage] = Seq.empty
 
     qd.qe.sparkPlan match {
       case s: ExecutedCommandExec =>
@@ -284,16 +285,16 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               s"outputTable: ${SparkUtils.getTableName(c.table)}, " +
               s"outputColumns: ${c.outputColumnNames.toString()}, " +
               s"outputColumns: ${c.outputColumns}")
-            var columns: Seq[ColumnLineage] = Seq.empty
             for (col <- c.outputColumns) {
-
-              var subColumns: Seq[ColumnLineage] = ColumnLineage.findColumns(
+              val subColumns: Seq[ColumnLineage] = ColumnLineage.findColumns(
                 c.children, col.name, col.exprId.id)
               val column = Some(ColumnLineage(
                 db = SparkUtils.getDatabaseName(c.table),
                 table = SparkUtils.getTableName(c.table),
                 name = col.name,
-                child = subColumns.toSet
+                child = subColumns.toSet,
+                nameIndex = col.exprId.id,
+                owner = c.table.owner
               ))
               columns = columns.++(column)
               logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
@@ -307,8 +308,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
             logDebug("")
         }
     }
-
-    Seq.empty
+    external.hiveColumnLineageToReference(qd, columns)
   }
 
   private def discoverInputsEntities(
