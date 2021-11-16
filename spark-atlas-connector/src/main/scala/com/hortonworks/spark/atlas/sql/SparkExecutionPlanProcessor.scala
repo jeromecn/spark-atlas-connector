@@ -99,7 +99,8 @@ object ColumnLineage extends Logging {
               s"name: ${ag.name}, " +
               s"qualifiedName: ${ag.qualifiedName}, " +
               s"sql: ${ag.sql}, " +
-              s"json: ${ag.toJSON}")
+              s"json: ${ag.toJSON}, " +
+              s"childSize: ${ag.children.length}")
 
             var alias: String = ""
             var attr: Seq[String] = Seq.empty[String]
