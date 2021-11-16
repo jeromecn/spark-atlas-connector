@@ -293,13 +293,13 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
                 db = SparkUtils.getDatabaseName(c.table),
                 table = SparkUtils.getTableName(c.table),
                 name = col.name,
-                child = subColumns
+                child = subColumns.toSet
               ))
               columns = columns.++(column)
               logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
                 s"col: ${col.name}, " +
                 s"colIndex: ${col.exprId.id}, " +
-                s"columnsTree: ${subColumns.toSet}")
+                s"columnsTree: ${column}")
             }
           case c: InsertIntoHadoopFsRelationCommand =>
             logDebug("")

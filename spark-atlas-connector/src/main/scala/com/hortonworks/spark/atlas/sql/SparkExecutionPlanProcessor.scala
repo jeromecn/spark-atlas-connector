@@ -53,7 +53,7 @@ case class ColumnLineage(
     table: String = "",
     name: String = "",
     nameIndex: Long = 0L,
-    child: Seq[ColumnLineage] = Seq.empty[ColumnLineage])
+    child: Set[ColumnLineage] = Set.empty[ColumnLineage])
 
 object ColumnLineage extends Logging {
 
@@ -108,7 +108,9 @@ object ColumnLineage extends Logging {
           case ch: org.apache.spark.sql.catalyst.expressions.Alias =>
             logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${ch.name}")
             var attrs: Seq[ColumnLineage] = findAggregateColumn(ch.children)
-            val aliasColumn = ColumnLineage(name = ch.name, nameIndex = ch.exprId.id, child = attrs)
+            val aliasColumn = ColumnLineage(name = ch.name,
+              nameIndex = ch.exprId.id,
+              child = attrs.toSet)
             alias = alias.++(Some(aliasColumn))
 
             logDebug(s"[ColumnLineage] findColumns, Aggregate, child, " +
