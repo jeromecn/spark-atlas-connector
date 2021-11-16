@@ -31,7 +31,7 @@ import org.apache.spark.sql.execution.streaming.sources.MicroBatchWrite
 import org.apache.spark.sql.hive.execution._
 import com.hortonworks.spark.atlas._
 import com.hortonworks.spark.atlas.types.metadata
-import com.hortonworks.spark.atlas.utils.Logging
+import com.hortonworks.spark.atlas.utils.{Logging, SparkUtils}
 import org.apache.atlas.model.instance.AtlasObjectId
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.PersistedView
@@ -83,17 +83,17 @@ object ColumnLineage extends Logging {
     plan.foreach(p => p match {
       case c: HiveTableRelation =>
         logDebug(s"[ColumnLineage] findColumns, HiveTableRelation, " +
-          s"dataCols: ${c.dataCols}, " +
-          s"json:${c.toJSON}")
+          s"dataCols: ${c.dataCols}, ")
         if (!c.dataCols.isEmpty) {
-//          c.dataCols.foreach(dc => if (parentColumn.equals(dc.name)) {
-//            // todo
-//            column.get.child.++(Some(ColumnLineage(
-//              db = dc.qualifier.head,
-//              table = dc.qualifier.last,
-//              name = dc.names
-//            )))
-//          })
+          val subColums = findAggregateColumn(c.dataCols).flatMap(cd =>
+            Option(ColumnLineage(
+              db = SparkUtils.getDatabaseName(c.tableMeta.identifier),
+              table = SparkUtils.getTableName(c.tableMeta.identifier),
+              name = cd.name,
+              nameIndex = cd.nameIndex
+            ))
+          )
+          columns = columns.++(subColums)
         }
       case c: Aggregate =>
         logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
@@ -132,8 +132,7 @@ object ColumnLineage extends Logging {
 
       case c: Project =>
         logDebug(s"[ColumnLineage] findColumns, Project, " +
-          s"projectList: ${c.projectList}, " +
-          s"json: ${c.toJSON}")
+          s"projectList: ${c.projectList}, ")
         for (p <- c.projectList) {
           if (p.name.equals(parentColumn) && p.exprId.id.equals(parentColumnIndex)) {
             val subColumns: Seq[ColumnLineage] = findAggregateColumn(p.children)
@@ -151,6 +150,10 @@ object ColumnLineage extends Logging {
         }
     })
 
+    logDebug(s"[ColumnLineage] findColumns, result, parentName: ${parentColumn}, " +
+      s"parentNameIndex: ${parentColumnIndex}, " +
+      s"subColumnsSize: ${columns.size}, " +
+      s"subColumns: ${columns}")
     columns
   }
 }
