@@ -36,7 +36,7 @@ import org.apache.atlas.model.instance.AtlasObjectId
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.PersistedView
 import org.apache.spark.sql.catalyst.catalog.HiveTableRelation
-import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project}
 import org.apache.spark.sql.connector.write.{DataWriterFactory, PhysicalWriteInfo, WriterCommitMessage}
@@ -59,18 +59,16 @@ object ColumnLineage extends Logging {
 
   def findAggregateColumn(expressions: Seq[Expression]): Seq[ColumnLineage] = {
     logDebug(s"[ColumnLineage] findAggregateColumn, expressions: ${expressions.size}")
-    var columns: Seq[ColumnLineage] = Seq.empty
-    expressions.foreach(exp => exp match {
-      case ch: org.apache.spark.sql.catalyst.expressions.AttributeReference =>
-        columns.++(Some(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)))
-        logDebug(s"[ColumnLineage] findAggregateColumn, expressions, AttributeReference, " +
-          s"columns: ${columns.size}")
+
+    var columns: Seq[ColumnLineage] = expressions.flatMap(e => e match {
+      case ch: AttributeReference =>
+        Option(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id))
       case e =>
         if (!e.children.isEmpty) {
           findAggregateColumn(e.children)
         }
+        None
     })
-
     columns
   }
   def findColumns(plan: Seq[LogicalPlan],
