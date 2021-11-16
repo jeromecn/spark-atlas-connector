@@ -70,24 +70,15 @@ object ColumnLineage extends Logging {
           columns = columns.++(findAggregateColumn(e.children))
         }
     })
-
-//    var columns: Seq[ColumnLineage] = expressions.flatMap(e => e match {
-//      case ch: AttributeReference =>
-//        Option(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id))
-//      case e =>
-//        if (!e.children.isEmpty) {
-//          findAggregateColumn(e.children)
-//        }
-//        None
-//    })
     logDebug(s"[ColumnLineage] findAggregateColumn, expressions: ${expressions.size}, " +
       s"columns: ${columns.size}, col: ${columns}")
     columns
   }
   def findColumns(plan: Seq[LogicalPlan],
-                  column: Option[ColumnLineage],
                   parentColumn: String,
-                  parentColumnIndex: Long): Unit = {
+                  parentColumnIndex: Long): Seq[ColumnLineage] = {
+
+    var columns: Seq[ColumnLineage] = Seq.empty
 
     plan.foreach(p => p match {
       case c: HiveTableRelation =>
@@ -95,14 +86,14 @@ object ColumnLineage extends Logging {
           s"dataCols: ${c.dataCols}, " +
           s"json:${c.toJSON}")
         if (!c.dataCols.isEmpty) {
-          c.dataCols.foreach(dc => if (parentColumn.equals(dc.name)) {
-            // todo
-            column.get.child.++(Some(ColumnLineage(
-              db = dc.qualifier.head,
-              table = dc.qualifier.last,
-              name = dc.name
-            )))
-          })
+//          c.dataCols.foreach(dc => if (parentColumn.equals(dc.name)) {
+//            // todo
+//            column.get.child.++(Some(ColumnLineage(
+//              db = dc.qualifier.head,
+//              table = dc.qualifier.last,
+//              name = dc.names
+//            )))
+//          })
         }
       case c: Aggregate =>
         logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
@@ -119,43 +110,48 @@ object ColumnLineage extends Logging {
             logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${ch.name}")
             var attrs: Seq[ColumnLineage] = findAggregateColumn(ch.children)
             val aliasColumn = ColumnLineage(name = ch.name, nameIndex = ch.exprId.id, child = attrs)
-            alias.++(Some(aliasColumn))
+            alias = alias.++(Some(aliasColumn))
 
             logDebug(s"[ColumnLineage] findColumns, Aggregate, child, " +
               s"alias: ${aliasColumn.name}, " +
               s"aliasindex: ${aliasColumn.nameIndex}, " +
               s"attrs: ${aliasColumn.child.size}, ${aliasColumn.child.toString()}")
+
+            if (aliasColumn.name.eq(parentColumn)
+              && aliasColumn.nameIndex.equals(parentColumnIndex)) {
+              attrs.foreach(sub =>
+                columns = columns.++(
+                  findColumns(c.children, sub.name, sub.nameIndex))
+              )
+            }
+
           case e =>
             logDebug("[ColumnLineage] findColumns, Aggregate, aggregateExpressions, child, " +
               s"case e: ${e}")
         })
 
-//        logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
-//          s"alias: ${alias}, parentColumn: ${parentColumn}, " +
-//          s"aliasIndex: ${aliasIndex}, parentColumnIndex: ${parentColumnIndex}, " +
-//          s"attr: ${attr}")
-//        if (alias.equals(parentColumn) && aliasIndex == parentColumnIndex) {
-//          for (ac <- attr) {
-//            findColumns(c.children, column, ac.name, ac.nameIndex)
-//          }
-//        }
       case c: Project =>
         logDebug(s"[ColumnLineage] findColumns, Project, " +
           s"projectList: ${c.projectList}, " +
           s"json: ${c.toJSON}")
         for (p <- c.projectList) {
-          val ags = p.name.split(" AS ")
-          if (ags.length == 2) {
-            // findColumns(c.children, column, ags.head)
+          if (p.name.equals(parentColumn) && p.exprId.id.equals(parentColumnIndex)) {
+            val subColumns: Seq[ColumnLineage] = findAggregateColumn(p.children)
+            subColumns.foreach(sub =>
+              columns = columns.++(
+                findColumns(c.children, sub.name, sub.nameIndex))
+            )
           }
         }
       case e =>
         logDebug(s"[ColumnLineage] findColumns, Other, " +
           s"e: ${e}")
         if (!e.children.isEmpty) {
-          findColumns(e.children, column, parentColumn, parentColumnIndex)
+          findColumns(e.children, parentColumn, parentColumnIndex)
         }
     })
+
+    columns
   }
 }
 case class QueryDetail(
