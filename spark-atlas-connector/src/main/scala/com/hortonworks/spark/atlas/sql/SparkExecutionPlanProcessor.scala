@@ -104,16 +104,22 @@ object ColumnLineage extends Logging {
             var alias: String = ""
             var attr: Seq[String] = Seq.empty[String]
             for (child <- ag.children) {
+              logDebug("[ColumnLineage] findColumns, Aggregate, aggregateExpressions, children, " +
+                s"className: ${child.getClass.getName}")
+              if (child.getClass.getName == "org.apache.spark.sql.catalyst.expressions.Alias") {
+
+              }
               child match {
                 case ch: org.apache.spark.sql.catalyst.expressions.Alias =>
                   logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${ch.name}")
                   alias = ch.name
                 case ch: org.apache.spark.sql.catalyst.expressions.AttributeReference =>
-                  logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${alias}, " +
+                  logDebug(s"[ColumnLineage] findColumns, Aggregate, child, refer: ${ch.name}, " +
                     s"attr: ${ch.name}")
                   attr.++(ch.name)
                 case e =>
-                  logDebug(e)
+                  logDebug("[ColumnLineage] findColumns, Aggregate, aggregateExpressions, child, " +
+                    s"case e: ${e}")
               }
             }
 
