@@ -310,9 +310,9 @@ object external {
       entity.setAttribute("inputs", inputObjIds)  // Dataset and Model entity
       entity.setAttribute("outputs", outputObjIds)  // Dataset entity
 
-      val query = Option(SACAtlasEntityReference(new AtlasObjectId(metadata.PROCESS_TYPE_STRING,
+      val query = new AtlasObjectId(metadata.PROCESS_TYPE_STRING,
         "qualifiedName",
-        appId))).toSeq.map(_.asObjectId).asJava
+        appId)
       entity.setAttribute("query", query)
 
       Some(new SACAtlasEntityWithDependencies(entity, inputs ++ outputs))
