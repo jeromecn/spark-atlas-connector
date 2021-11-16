@@ -69,6 +69,8 @@ object ColumnLineage extends Logging {
         }
         None
     })
+    logDebug(s"[ColumnLineage] findAggregateColumn, expressions: ${expressions.size}, " +
+      s"columns: ${columns.size}")
     columns
   }
   def findColumns(plan: Seq[LogicalPlan],
