@@ -142,7 +142,7 @@ object ColumnLineage extends Logging {
         logDebug(s"[ColumnLineage] findColumns, Other, " +
           s"e: ${e}")
         if (!e.children.isEmpty) {
-          columns = columns.++(findColumns(e.children, parentColumn, parentColumnIndex))
+          findColumns(e.children, parentColumn, parentColumnIndex)
         }
     })
 
