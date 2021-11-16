@@ -61,7 +61,7 @@ object ColumnLineage extends Logging {
     logDebug(s"[ColumnLineage] findAggregateColumn, expressions: ${expressions.size}")
     expressions.foreach(exp => exp match {
       case ch: org.apache.spark.sql.catalyst.expressions.AttributeReference =>
-        columns.++(Some(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)))
+        columns:+ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)
         logDebug(s"[ColumnLineage] findAggregateColumn, expressions, AttributeReference, " +
           s"columns: ${columns.size}")
       case e =>
