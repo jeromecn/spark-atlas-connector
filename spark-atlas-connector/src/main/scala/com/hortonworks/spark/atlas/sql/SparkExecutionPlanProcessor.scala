@@ -134,14 +134,14 @@ object ColumnLineage extends Logging {
 //                  s"case e: ${e}")
 //            }
 //          }
-          logDebug(s"\"[ColumnLineage] findColumns, Aggregate, " +
-            s"alias: ${alias}, parentColumn: ${parentColumn}, " +
-            s"aliasIndex: ${aliasIndex}, parentColumnIndex: ${parentColumnIndex}, " +
-            s"attr: ${attr}")
-          if (alias.equals(parentColumn) && aliasIndex == parentColumnIndex) {
-            for (ac <- attr) {
-              findColumns(c.children, column, ac.name, ac.nameIndex)
-            }
+        }
+        logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
+          s"alias: ${alias}, parentColumn: ${parentColumn}, " +
+          s"aliasIndex: ${aliasIndex}, parentColumnIndex: ${parentColumnIndex}, " +
+          s"attr: ${attr}")
+        if (alias.equals(parentColumn) && aliasIndex == parentColumnIndex) {
+          for (ac <- attr) {
+            findColumns(c.children, column, ac.name, ac.nameIndex)
           }
         }
       case c: Project =>
