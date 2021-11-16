@@ -85,15 +85,16 @@ object ColumnLineage extends Logging {
         logDebug(s"[ColumnLineage] findColumns, HiveTableRelation, " +
           s"dataCols: ${c.dataCols}, ")
         if (!c.dataCols.isEmpty) {
-          val subColums = findAggregateColumn(c.dataCols).flatMap(cd =>
-            Option(ColumnLineage(
-              db = SparkUtils.getDatabaseName(c.tableMeta.identifier),
-              table = SparkUtils.getTableName(c.tableMeta.identifier),
-              name = cd.name,
-              nameIndex = cd.nameIndex
-            ))
+          findAggregateColumn(c.dataCols).foreach(cd =>
+            if (cd.name.equals(parentColumn) && cd.nameIndex.equals(parentColumnIndex)) {
+              columns = columns.++(Option(ColumnLineage(
+                db = SparkUtils.getDatabaseName(c.tableMeta.identifier),
+                table = SparkUtils.getTableName(c.tableMeta.identifier),
+                name = cd.name,
+                nameIndex = cd.nameIndex
+              )))
+            }
           )
-          columns = columns.++(subColums)
         }
       case c: Aggregate =>
         logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
