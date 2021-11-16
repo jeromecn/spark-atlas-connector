@@ -52,6 +52,7 @@ case class ColumnLineage(
     db: String = "",
     table: String = "",
     name: String = "",
+    nameIndex: Long = 0L,
     child: Seq[ColumnLineage] = Seq.empty[ColumnLineage])
 
 object ColumnLineage extends Logging {
@@ -72,8 +73,9 @@ object ColumnLineage extends Logging {
 //  }
 
   def findColumns(plan: Seq[LogicalPlan],
-                          column: Option[ColumnLineage],
-                          parentColumn: String): Unit = {
+                  column: Option[ColumnLineage],
+                  parentColumn: String,
+                  parentColumnIndex: Long): Unit = {
 
     plan.foreach(p => p match {
       case c: HiveTableRelation =>
@@ -94,41 +96,34 @@ object ColumnLineage extends Logging {
         logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
           s"aggregateExpressions: ${c.toJSON}")
 
-        if (!c.expressions.isEmpty) {
-          for ( ag <- c.expressions) {
+        var alias: String = ""
+        var aliasIndex: Long = 0L
+        var attr: Seq[ColumnLineage] = Seq.empty[ColumnLineage]
+
+        if (!c.aggregateExpressions.isEmpty) {
+          for ( ag <- c.aggregateExpressions) {
             logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
               s"sql: ${ag.sql}, " +
               s"json: ${ag.toJSON}, " +
               s"childSize: ${ag.children.length}")
 
-
-
-            var alias: String = ""
-            var attr: Seq[String] = Seq.empty[String]
-            for (child <- ag.children) {
-              logDebug("[ColumnLineage] findColumns, Aggregate, aggregateExpressions, children, " +
-                s"className: ${child.getClass.getName}")
-              if (child.getClass.getName == "org.apache.spark.sql.catalyst.expressions.Alias") {
-
-              }
-              child match {
-                case ch: org.apache.spark.sql.catalyst.expressions.Alias =>
-                  logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${ch.name}")
-                  alias = ch.name
-                case ch: org.apache.spark.sql.catalyst.expressions.AttributeReference =>
-                  logDebug(s"[ColumnLineage] findColumns, Aggregate, child, refer: ${ch.name}, " +
-                    s"attr: ${ch.name}")
-                  attr.++(ch.name)
-                case e =>
-                  logDebug("[ColumnLineage] findColumns, Aggregate, aggregateExpressions, child, " +
-                    s"case e: ${e}")
-              }
+            ag match {
+              case ch: org.apache.spark.sql.catalyst.expressions.Alias =>
+                logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${ch.name}")
+                alias = ch.name
+                aliasIndex = ch.exprId.id
+              case ch: org.apache.spark.sql.catalyst.expressions.AttributeReference =>
+                logDebug(s"[ColumnLineage] findColumns, Aggregate, child, refer: ${ch.name}, " +
+                  s"attr: ${ch.name}")
+                attr.++(Some(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)))
+              case e =>
+                logDebug("[ColumnLineage] findColumns, Aggregate, aggregateExpressions, child, " +
+                  s"case e: ${e}")
             }
-
-            if (alias.equals(parentColumn)) {
-              for (ac <- attr) {
-                findColumns(c.children, column, ac)
-              }
+          }
+          if (alias.equals(parentColumn) && aliasIndex == parentColumnIndex) {
+            for (ac <- attr) {
+              findColumns(c.children, column, ac.name, ac.nameIndex)
             }
           }
         }
@@ -139,14 +134,14 @@ object ColumnLineage extends Logging {
         for (p <- c.projectList) {
           val ags = p.name.split(" AS ")
           if (ags.length == 2) {
-            findColumns(c.children, column, ags.head)
+            // findColumns(c.children, column, ags.head)
           }
         }
       case e =>
         logDebug(s"[ColumnLineage] findColumns, Other, " +
           s"e: ${e}")
         if (!e.children.isEmpty) {
-          findColumns(e.children, column, parentColumn)
+          findColumns(e.children, column, parentColumn, parentColumnIndex)
         }
     })
   }
