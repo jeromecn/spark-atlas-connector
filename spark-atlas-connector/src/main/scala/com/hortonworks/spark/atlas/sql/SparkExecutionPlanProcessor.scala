@@ -94,13 +94,11 @@ object ColumnLineage extends Logging {
         }
       case c: Aggregate =>
         logDebug(s"[ColumnLineage] findColumns, Aggregate, " +
-          s"aggregateExpressions: ${c.aggregateExpressions.size}, " +
-          s"expressions: ${c.expressions.size}, " +
-          s"children: ${c.children.size}, " +
+          s"aggregateExpressions: ${c.aggregateExpressions.length}, " +
+          s"expressions: ${c.expressions.length}, " +
+          s"children: ${c.children.length}, " +
           s"childJson: ${c.child.toJSON}, ")
 
-        c.child.constraints.iterator.foreach(a =>
-          logDebug(s"[ColumnLineage] findColumns, Aggregate, constraints, ${a.getClass.getName}"))
 
         var alias: String = ""
         var aliasIndex: Long = 0L
