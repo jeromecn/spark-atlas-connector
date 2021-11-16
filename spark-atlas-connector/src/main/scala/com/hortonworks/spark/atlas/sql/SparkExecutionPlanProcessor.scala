@@ -108,6 +108,11 @@ object ColumnLineage extends Logging {
             logDebug(s"[ColumnLineage] findColumns, Aggregate, child, alias: ${ch.name}")
             alias = ch.name
             aliasIndex = ch.exprId.id
+
+            ch.children.foreach(a => logDebug(s"[ColumnLineage] findColumns, " +
+              s"sAggregate, child, child, " +
+              s"a:${a.getClass.getName}"))
+
           case ch: org.apache.spark.sql.catalyst.expressions.AttributeReference =>
             logDebug(s"[ColumnLineage] findColumns, Aggregate, child, refer: ${ch.name}, " +
               s"attr: ${ch.name}")
