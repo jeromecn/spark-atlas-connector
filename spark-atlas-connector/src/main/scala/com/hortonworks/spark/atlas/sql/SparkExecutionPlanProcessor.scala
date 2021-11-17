@@ -25,7 +25,7 @@ import com.hortonworks.spark.atlas.sql.CommandsHarvester.WriteToDataSourceV2Harv
 import com.hortonworks.spark.atlas.sql.SparkExecutionPlanProcessor.SinkDataSourceWriter
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command._
-import org.apache.spark.sql.execution.datasources.{InsertIntoHadoopFsRelationCommand, SaveIntoDataSourceCommand}
+import org.apache.spark.sql.execution.datasources.{InsertIntoHadoopFsRelationCommand, LogicalRelation, SaveIntoDataSourceCommand}
 import org.apache.spark.sql.execution.datasources.v2.WriteToDataSourceV2Exec
 import org.apache.spark.sql.execution.streaming.sources.MicroBatchWrite
 import org.apache.spark.sql.hive.execution._
@@ -83,9 +83,22 @@ object ColumnLineage extends Logging {
     var columns: Seq[ColumnLineage] = Seq.empty
 
     plan.foreach(p => p match {
-      case c: InMemoryRelation =>
-        logDebug(s"[ColumnLineage] findColumns, HiveTableRelation, " +
+      case c: LogicalRelation =>
+        logDebug(s"[ColumnLineage] findColumns, LogicalRelation, " +
           s"json: ${c.toJSON}")
+        if (!c.expressions.isEmpty) {
+          findAggregateColumn(c.expressions).foreach(cd =>
+            if (cd.name.equals(parentColumn) && cd.nameIndex.equals(parentColumnIndex)) {
+              columns = columns.++(Option(ColumnLineage(
+                db = SparkUtils.getDatabaseName(c.catalogTable.get.identifier),
+                table = SparkUtils.getTableName(c.catalogTable.get.identifier),
+                name = cd.name,
+                nameIndex = cd.nameIndex,
+                owner = c.catalogTable.get.owner
+              )))
+            }
+          )
+        }
       case c: HiveTableRelation =>
         logDebug(s"[ColumnLineage] findColumns, HiveTableRelation, " +
           s"dataCols: ${c.dataCols}, " +
