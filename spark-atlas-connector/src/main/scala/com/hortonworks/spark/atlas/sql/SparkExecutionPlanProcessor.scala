@@ -84,7 +84,8 @@ object ColumnLineage extends Logging {
     plan.foreach(p => p match {
       case c: HiveTableRelation =>
         logDebug(s"[ColumnLineage] findColumns, HiveTableRelation, " +
-          s"dataCols: ${c.dataCols}, ")
+          s"dataCols: ${c.dataCols}, " +
+          s"json: ${c.toJSON}")
         if (!c.dataCols.isEmpty) {
           findAggregateColumn(c.dataCols).foreach(cd =>
             if (cd.name.equals(parentColumn) && cd.nameIndex.equals(parentColumnIndex)) {
@@ -134,7 +135,8 @@ object ColumnLineage extends Logging {
 
       case c: Project =>
         logDebug(s"[ColumnLineage] findColumns, Project, " +
-          s"projectList: ${c.projectList}, ")
+          s"projectList: ${c.projectList}, " +
+          s"json: ${c.toJSON}")
         for (p <- c.projectList) {
           if (p.name.equals(parentColumn) && p.exprId.id.equals(parentColumnIndex)) {
             val subColumns: Seq[ColumnLineage] = findAggregateColumn(p.children)
@@ -145,7 +147,8 @@ object ColumnLineage extends Logging {
         }
       case e =>
         logDebug(s"[ColumnLineage] findColumns, Other, " +
-          s"e: ${e}")
+          s"e: ${e}, " +
+          s"json: ${e.toJSON}")
         if (!e.children.isEmpty) {
           columns = columns.++(findColumns(e.children, parentColumn, parentColumnIndex))
         }
