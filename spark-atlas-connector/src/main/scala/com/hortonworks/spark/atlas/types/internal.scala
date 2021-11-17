@@ -234,7 +234,7 @@ object internal extends Logging {
   def etlProcessLineage(inputs: Seq[SACAtlasReferenceable],
                         outputs: Seq[SACAtlasReferenceable],
                         qd: QueryDetail): SACAtlasEntityWithDependencies = {
-    val entity = new AtlasEntity(metadata.HIVE_COLUMN_LINEAGE)
+    val entity = new AtlasEntity(metadata.SPARK_COLUMN_LINEAGE)
 
     val appId = SparkUtils.sparkSession.sparkContext.applicationId
     val appName = SparkUtils.sparkSession.sparkContext.appName match {

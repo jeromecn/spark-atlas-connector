@@ -107,7 +107,7 @@ trait AtlasEntityUtils extends Logging {
     }
   }
 
-  def sparkColumnLineagesType: String = metadata.COLUMN_LINEAGE
+  def sparkColumnLineagesType: String = metadata.SPARK_COLUMN_LINEAGE
 
 
 }

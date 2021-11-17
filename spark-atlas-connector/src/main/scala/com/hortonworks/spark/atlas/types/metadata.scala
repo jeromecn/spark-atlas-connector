@@ -27,7 +27,7 @@ object metadata {
   val ML_PIPELINE_TYPE_STRING = "spark_ml_pipeline"
   val ML_MODEL_TYPE_STRING = "spark_ml_model"
   val PROCESS_COLUMN_LINEAGES = "spark_process_column_lineages"
-  val COLUMN_LINEAGE = "spark_column_lineage"
+  val SPARK_COLUMN_LINEAGE = "spark_column_lineage"
   val SPARK_COLUMN = "spark_column"
   val HIVE_COLUMN_LINEAGE = "hive_column_lineage"
 }
