@@ -34,7 +34,7 @@ import com.hortonworks.spark.atlas.types.metadata
 import com.hortonworks.spark.atlas.utils.{Logging, SparkUtils}
 import org.apache.atlas.model.instance.AtlasObjectId
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.analysis.PersistedView
+import org.apache.spark.sql.catalyst.analysis.{PersistedView, UnresolvedRelation}
 import org.apache.spark.sql.catalyst.catalog.HiveTableRelation
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
@@ -129,8 +129,8 @@ object ColumnLineage extends Logging {
             }
 
           case e =>
-            logDebug("[ColumnLineage] findColumns, Aggregate, aggregateExpressions, child, " +
-              s"case e: ${e}")
+            logInfo("[ColumnLineage] [findColumns] [NotImplementedExpressions] " +
+              s"Expressions: ${e.toJSON}")
         })
 
       case c: Project =>

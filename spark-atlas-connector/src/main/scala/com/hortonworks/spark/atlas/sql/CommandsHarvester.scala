@@ -22,7 +22,7 @@ import org.json4s.jackson.JsonMethods._
 
 import scala.util.Try
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
+import org.apache.spark.sql.catalyst.analysis.{PersistedView, UnresolvedRelation}
 import org.apache.spark.sql.catalyst.catalog.HiveTableRelation
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution._
@@ -93,7 +93,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
     override def harvest(
         node: CreateTableCommand,
         qd: QueryDetail): Seq[SACAtlasReferenceable] = {
-      Seq(tableToEntity(node.table)) ++ makeColumnLineageEntities(qd)
+      Seq(tableToEntity(node.table))
     }
   }
 
@@ -116,7 +116,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       val inputEntities = Seq(external.pathToEntity(node.path))
       val outputEntities = Seq(prepareEntity(node.table))
 
-      makeProcessEntities(inputEntities, outputEntities, qd) ++ makeColumnLineageEntities(qd)
+      makeProcessEntities(inputEntities, outputEntities, qd)
     }
   }
 
@@ -162,7 +162,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
         node: CreateDataSourceTableCommand,
         qd: QueryDetail): Seq[SACAtlasReferenceable] = {
       // only have table entities
-      Seq(tableToEntity(node.table)) ++ makeColumnLineageEntities(qd)
+      Seq(tableToEntity(node.table))
     }
   }
 
@@ -248,25 +248,39 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       case s: ExecutedCommandExec =>
         s.cmd match {
           case c: LoadDataCommand =>
-            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+            logDebug("[makeColumnLineageEntities] [ExecutedCommandExec] " +
               "LoadDataCommand, " +
               s"json: ${c.toJSON}")
           case c: CreateViewCommand =>
-            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+            c.viewType match {
+              case PersistedView =>
+                logDebug("")
+              case e =>
+                logDebug("")
+            }
+            logDebug("[makeColumnLineageEntities] [ExecutedCommandExec] " +
               "CreateViewCommand, " +
               s"json: ${c.toJSON}")
           case c: SaveIntoDataSourceCommand =>
-            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+            logDebug("[makeColumnLineageEntities] [ExecutedCommandExec] " +
               "SaveIntoDataSourceCommand, " +
               s"json: ${c.toJSON}")
           case c: CreateTableCommand =>
-            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+            logDebug("[makeColumnLineageEntities] [ExecutedCommandExec] " +
               "CreateTableCommand, " +
               s"json: ${c.toJSON}")
           case c: CreateDataSourceTableCommand =>
-            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+            logDebug("[makeColumnLineageEntities] [ExecutedCommandExec] " +
               "CreateDataSourceTableCommand, " +
               s"json: ${c.toJSON}")
+          case c: InsertIntoHiveDirCommand =>
+            logDebug("[makeColumnLineageEntities] [ExecutedCommandExec] " +
+              "InsertIntoHiveDirCommand, " +
+              s"json: ${c.toJSON}")
+          case e =>
+            logInfo("[makeColumnLineageEntities] [ExecutedCommandExec] " +
+              "[NotImplementedCommand] " +
+              s"Command: ${e.toJSON}")
         }
       case s: DataWritingCommandExec =>
         s.cmd match {
@@ -374,7 +388,14 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
                 s"colIndex: ${col.exprId.id}, " +
                 s"columnsTree: ${column}")
             }
+          case e =>
+            logInfo("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+              "[NotImplementedCommand] " +
+              s"Command: ${e.toJSON}")
         }
+      case e =>
+        logInfo("[makeColumnLineageEntities] [NotImplementedExec] " +
+          s"Exec: ${e.toJSON}")
     }
     external.hiveColumnLineageToReference(qd, columns)
   }
