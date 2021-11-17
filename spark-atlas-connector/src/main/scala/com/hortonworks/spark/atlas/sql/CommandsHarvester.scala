@@ -22,7 +22,7 @@ import org.json4s.jackson.JsonMethods._
 
 import scala.util.Try
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.analysis.{PersistedView, UnresolvedRelation}
+import org.apache.spark.sql.catalyst.analysis.{LocalTempView, PersistedView, UnresolvedRelation}
 import org.apache.spark.sql.catalyst.catalog.HiveTableRelation
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution._
@@ -157,6 +157,29 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
     }
   }
 
+  object CreateLocalViewHarvester extends Harvester[CreateViewCommand] {
+    override def harvest(
+                          node: CreateViewCommand,
+                          qd: QueryDetail): Seq[SACAtlasReferenceable] = {
+//      // from table entities
+//      val child = node.child.asInstanceOf[Project].child
+//      val inputEntities = child match {
+//        case r: UnresolvedRelation => Seq(prepareEntity(r.multipartIdentifier))
+//        case _: OneRowRelation => Seq.empty
+//        case n =>
+//          logWarn(s"Unknown leaf node: $n")
+//          Seq.empty
+//      }
+//
+//      // new view entities
+//      val viewIdentifier = node.name
+//      val outputEntities = Seq(prepareEntity(viewIdentifier))
+//
+//      makeProcessEntities(inputEntities, outputEntities, qd) ++ makeColumnLineageEntities(qd)
+      makeColumnLineageEntities(qd)
+    }
+  }
+
   object CreateDataSourceTableHarvester extends Harvester[CreateDataSourceTableCommand] {
     override def harvest(
         node: CreateDataSourceTableCommand,
@@ -255,6 +278,10 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
             c.viewType match {
               case PersistedView =>
                 logDebug("")
+              case LocalTempView =>
+                logDebug("[makeColumnLineageEntities] [ExecutedCommandExec] " +
+                  "CreateViewCommand, LocalTempView, " +
+                  s"json: ${c.toJSON}")
               case e =>
                 logDebug("")
             }

@@ -34,13 +34,14 @@ import com.hortonworks.spark.atlas.types.metadata
 import com.hortonworks.spark.atlas.utils.{Logging, SparkUtils}
 import org.apache.atlas.model.instance.AtlasObjectId
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.analysis.{PersistedView, UnresolvedRelation}
+import org.apache.spark.sql.catalyst.analysis.{LocalTempView, PersistedView, UnresolvedRelation}
 import org.apache.spark.sql.catalyst.catalog.HiveTableRelation
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project}
 import org.apache.spark.sql.connector.write.{DataWriterFactory, PhysicalWriteInfo, WriterCommitMessage}
 import org.apache.spark.sql.connector.write.streaming.{StreamingDataWriterFactory, StreamingWrite}
+import org.apache.spark.sql.execution.columnar.InMemoryRelation
 import org.apache.spark.sql.execution.streaming.StreamExecution
 import org.apache.spark.sql.streaming.SinkProgress
 import org.apache.spark.sql.streaming.StreamingQueryListener.QueryProgressEvent
@@ -82,6 +83,9 @@ object ColumnLineage extends Logging {
     var columns: Seq[ColumnLineage] = Seq.empty
 
     plan.foreach(p => p match {
+      case c: InMemoryRelation =>
+        logDebug(s"[ColumnLineage] findColumns, HiveTableRelation, " +
+          s"json: ${c.toJSON}")
       case c: HiveTableRelation =>
         logDebug(s"[ColumnLineage] findColumns, HiveTableRelation, " +
           s"dataCols: ${c.dataCols}, " +
@@ -224,6 +228,9 @@ class SparkExecutionPlanProcessor(
               case PersistedView =>
                 logDebug(s"CREATE VIEW AS SELECT query: ${qd.qe}")
                 CommandsHarvester.CreateViewHarvester.harvest(c, qd)
+              case LocalTempView =>
+                logDebug(s"CREATE TEMPORARY VIEW AS SELECT QUERY: ${qd.qe}")
+                CommandsHarvester.CreateLocalViewHarvester.harvest(c, qd)
               case _ => Seq.empty
             }
 
