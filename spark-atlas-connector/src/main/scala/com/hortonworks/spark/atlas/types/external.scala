@@ -322,7 +322,7 @@ object external extends Logging{
         logDebug(s"[external] hiveColumnLineageToReference, entity: ${entity}, result: ${result}")
         Some(result)
       } else {
-        Option.empty
+        Seq.empty
       }
     })
   }
