@@ -248,15 +248,25 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
       case s: ExecutedCommandExec =>
         s.cmd match {
           case c: LoadDataCommand =>
-            logDebug("")
+            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+              "LoadDataCommand, " +
+              s"json: ${c.toJSON}")
           case c: CreateViewCommand =>
-            logDebug("")
+            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+              "CreateViewCommand, " +
+              s"json: ${c.toJSON}")
           case c: SaveIntoDataSourceCommand =>
-            logDebug("")
+            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+              "SaveIntoDataSourceCommand, " +
+              s"json: ${c.toJSON}")
           case c: CreateTableCommand =>
-            logDebug("")
+            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+              "CreateTableCommand, " +
+              s"json: ${c.toJSON}")
           case c: CreateDataSourceTableCommand =>
-            logDebug("")
+            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+              "CreateDataSourceTableCommand, " +
+              s"json: ${c.toJSON}")
         }
       case s: DataWritingCommandExec =>
         s.cmd match {
@@ -265,26 +275,35 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               s"CreateHiveTableAsSelectCommand, " +
               s"outputDb: ${c.tableDesc.database}, " +
               s"outputTable: ${c.tableDesc}, " +
-              s"outputColumns: ${c.outputColumnNames.toString()}, ")
-            val columns = Seq.empty[ColumnLineage]
-            for (col <- c.outputColumnNames) {
+              s"outputColumns: ${c.outputColumnNames.toString()}, " +
+              s"json: ${c.toJSON}")
+            for (col <- c.outputColumns) {
+              val subColumns: Seq[ColumnLineage] = ColumnLineage.findColumns(
+                c.children, col.name, col.exprId.id)
               val column = Some(ColumnLineage(
                 db = SparkUtils.getDatabaseName(c.tableDesc),
                 table = SparkUtils.getTableName(c.tableDesc),
-                name = col
+                name = col.name,
+                child = subColumns.toSet,
+                nameIndex = col.exprId.id,
+                owner = c.tableDesc.owner
               ))
               // ColumnLineage.findColumns(c.children, column, col.)
-              columns.++(column)
+              columns = columns.++(column)
+              logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+                "CreateHiveTableAsSelectCommand " +
+                s"col: ${col.name}, " +
+                s"colIndex: ${col.exprId.id}, " +
+                s"columnsTree: ${column}")
             }
-            logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
-              s"columnsTree: ${columns}")
           case c: InsertIntoHiveTable =>
             logDebug(s"[makeColumnLineageEntities] [DataWritingCommandExec] " +
               s"InsertIntoHiveTable, " +
               s"outputDb: ${SparkUtils.getDatabaseName(c.table)}, " +
               s"outputTable: ${SparkUtils.getTableName(c.table)}, " +
               s"outputColumns: ${c.outputColumnNames.toString()}, " +
-              s"outputColumns: ${c.outputColumns}")
+              s"outputColumns: ${c.outputColumns}, " +
+              s"json: ${c.toJSON}")
             for (col <- c.outputColumns) {
               val subColumns: Seq[ColumnLineage] = ColumnLineage.findColumns(
                 c.children, col.name, col.exprId.id)
@@ -298,14 +317,63 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               ))
               columns = columns.++(column)
               logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+                "InsertIntoHiveTable" +
                 s"col: ${col.name}, " +
                 s"colIndex: ${col.exprId.id}, " +
                 s"columnsTree: ${column}")
             }
           case c: InsertIntoHadoopFsRelationCommand =>
-            logDebug("")
+            logDebug(s"[makeColumnLineageEntities] [DataWritingCommandExec] " +
+              s"InsertIntoHadoopFsRelationCommand, " +
+              s"outputDb: ${c.catalogTable.get.identifier.database}, " +
+              s"outputTable: ${c.catalogTable.get.identifier.table}, " +
+              s"outputColumns: ${c.outputColumnNames.toString()}, " +
+              s"json: ${c.toJSON}")
+            for (col <- c.outputColumns) {
+              val subColumns: Seq[ColumnLineage] = ColumnLineage.findColumns(
+                c.children, col.name, col.exprId.id)
+              val column = Some(ColumnLineage(
+                db = SparkUtils.getDatabaseName(c.catalogTable.get.identifier),
+                table = SparkUtils.getTableName(c.catalogTable.get.identifier),
+                name = col.name,
+                child = subColumns.toSet,
+                nameIndex = col.exprId.id,
+                owner = c.catalogTable.get.owner
+              ))
+              // ColumnLineage.findColumns(c.children, column, col.)
+              columns = columns.++(column)
+              logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+                "InsertIntoHadoopFsRelationCommand " +
+                s"col: ${col.name}, " +
+                s"colIndex: ${col.exprId.id}, " +
+                s"columnsTree: ${column}")
+            }
           case c: CreateDataSourceTableAsSelectCommand =>
-            logDebug("")
+            logDebug(s"[makeColumnLineageEntities] [DataWritingCommandExec] " +
+              s"CreateDataSourceTableAsSelectCommand, " +
+              s"outputDb: ${c.table.identifier.database}, " +
+              s"outputTable: ${c.table.identifier.table}, " +
+              s"outputColumns: ${c.outputColumnNames.toString()}, " +
+              s"json: ${c.toJSON}")
+            for (col <- c.outputColumns) {
+              val subColumns: Seq[ColumnLineage] = ColumnLineage.findColumns(
+                c.children, col.name, col.exprId.id)
+              val column = Some(ColumnLineage(
+                db = SparkUtils.getDatabaseName(c.table.identifier),
+                table = SparkUtils.getTableName(c.table.identifier),
+                name = col.name,
+                child = subColumns.toSet,
+                nameIndex = col.exprId.id,
+                owner = c.table.owner
+              ))
+              // ColumnLineage.findColumns(c.children, column, col.)
+              columns = columns.++(column)
+              logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
+                "CreateDataSourceTableAsSelectCommand " +
+                s"col: ${col.name}, " +
+                s"colIndex: ${col.exprId.id}, " +
+                s"columnsTree: ${column}")
+            }
         }
     }
     external.hiveColumnLineageToReference(qd, columns)
