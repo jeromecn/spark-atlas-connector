@@ -314,7 +314,7 @@ object external extends Logging{
         "qualifiedName",
         appId)
       entity.setAttribute("query", query)
-
+      entity.setAttribute("depenendencyType", "SIMPLE")
       val result = new SACAtlasEntityWithDependencies(entity, inputs ++ outputs)
       logDebug(s"[external] hiveColumnLineageToReference, entity: ${entity}, result: ${result}")
       Some(result)
