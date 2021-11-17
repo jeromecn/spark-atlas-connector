@@ -139,10 +139,14 @@ object ColumnLineage extends Logging {
           s"json: ${c.toJSON}")
         for (p <- c.projectList) {
           if (p.name.equals(parentColumn) && p.exprId.id.equals(parentColumnIndex)) {
-            val subColumns: Seq[ColumnLineage] = findAggregateColumn(p.children)
-            subColumns.foreach(sub =>
-              columns = columns.++(findColumns(c.children, sub.name, sub.nameIndex))
-            )
+            if (!p.children.isEmpty) {
+              val subColumns: Seq[ColumnLineage] = findAggregateColumn(p.children)
+              subColumns.foreach(sub =>
+                columns = columns.++(findColumns(c.children, sub.name, sub.nameIndex))
+              )
+            } else {
+              columns = columns.++(findColumns(c.children, p.name, p.exprId.id))
+            }
           }
         }
       case e =>
