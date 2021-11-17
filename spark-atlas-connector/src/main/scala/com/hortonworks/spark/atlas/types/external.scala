@@ -27,14 +27,14 @@ import org.apache.hadoop.fs.Path
 import org.apache.hadoop.hive.ql.session.SessionState
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, CatalogTable}
 import com.hortonworks.spark.atlas.{AtlasUtils, SACAtlasEntityReference, SACAtlasEntityWithDependencies, SACAtlasReferenceable}
-import com.hortonworks.spark.atlas.utils.{JdbcUtils, SparkUtils}
+import com.hortonworks.spark.atlas.utils.{JdbcUtils, Logging, SparkUtils}
 import org.apache.spark.sql.SparkSession
 
 import javax.management.Query
 import scala.jdk.CollectionConverters.asJavaIterableConverter
 
 
-object external {
+object external extends Logging{
   // External metadata types used to link with external entities
 
   // ================ File system entities ======================
@@ -315,7 +315,9 @@ object external {
         appId)
       entity.setAttribute("query", query)
 
-      Some(new SACAtlasEntityWithDependencies(entity, inputs ++ outputs))
+      val result = new SACAtlasEntityWithDependencies(entity, inputs ++ outputs)
+      logDebug(s"[external] hiveColumnLineageToReference, entity: ${entity}, result: ${result}")
+      Some(result)
     })
 
   }
