@@ -293,8 +293,14 @@ object external extends Logging{
           case default => default + s" $appId"
         }
 
-        entity.setAttribute("qualifiedName", appId)
-        entity.setAttribute("name", appName)
+        val queryName = col.child.reduce((a, b) => {
+          s"${a.db}.${a.table}@${a.owner}:${appId}:${b.db}.${b.table}@${b.owner}:${appId}"
+        })
+        val resultName = s"${col.db}.${col.table}@${col.owner}:${appId}:${col.name}"
+
+        val name = s"QUERY:${queryName}:INSERT:${resultName}"
+        entity.setAttribute("qualifiedName", name)
+        entity.setAttribute("name", name)
 
         val outputs = Option(SACAtlasEntityReference(
           new AtlasObjectId(HIVE_COLUMN_TYPE_STRING, "qualifiedName",
