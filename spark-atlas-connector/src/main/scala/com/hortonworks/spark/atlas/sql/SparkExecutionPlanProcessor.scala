@@ -36,7 +36,7 @@ import org.apache.atlas.model.instance.AtlasObjectId
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.{LocalTempView, PersistedView, UnresolvedRelation}
 import org.apache.spark.sql.catalyst.catalog.HiveTableRelation
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, GetMapValue, Literal}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, GetArrayItem, GetMapValue, Literal}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project}
 import org.apache.spark.sql.connector.write.{DataWriterFactory, PhysicalWriteInfo, WriterCommitMessage}
@@ -56,6 +56,7 @@ case class ColumnLineage(
     name: String = "",
     nameIndex: Long = 0L,
     owner: String = "",
+    literal: String = "",
     child: Set[ColumnLineage] = Set.empty[ColumnLineage])
 
 object ColumnLineage extends Logging {
@@ -84,6 +85,17 @@ object ColumnLineage extends Logging {
       case ch: GetMapValue =>
         logDebug(s"[ColumnLineage] findAggregateColumn, expressions, GetMapValue," +
           s" item:${ch.toJSON}")
+        val attr = ch.children.find(c =>
+          c.isInstanceOf[org.apache.spark.sql.catalyst.expressions.AttributeReference])
+          .get
+          .asInstanceOf[org.apache.spark.sql.catalyst.expressions.AttributeReference]
+        val literal = ch.children.find(c =>
+          c.isInstanceOf[org.apache.spark.sql.catalyst.expressions.Literal])
+          .get
+          .asInstanceOf[org.apache.spark.sql.catalyst.expressions.Literal]
+
+        columns = columns.++(Some(ColumnLineage(name = attr.name,
+          nameIndex = attr.exprId.id, literal = literal.value.toString)))
       case e =>
         if (!e.children.isEmpty) {
           columns = columns.++(findAggregateColumn(e.children))
@@ -94,8 +106,7 @@ object ColumnLineage extends Logging {
     columns
   }
   def findColumns(plan: Seq[LogicalPlan],
-                  parentColumn: String,
-                  parentColumnIndex: Long): Seq[ColumnLineage] = {
+                  parentColumn: ColumnLineage): Seq[ColumnLineage] = {
 
     var columns: Seq[ColumnLineage] = Seq.empty
 
@@ -105,13 +116,14 @@ object ColumnLineage extends Logging {
           s"json: ${c.toJSON}")
         if (!c.expressions.isEmpty) {
           findAggregateColumn(c.expressions).foreach(cd =>
-            if (cd.name.equals(parentColumn) && cd.nameIndex.equals(parentColumnIndex)) {
+            if (cd.name.equals(parentColumn.name) && cd.nameIndex.equals(parentColumn.nameIndex)) {
               columns = columns.++(Option(ColumnLineage(
                 db = SparkUtils.getDatabaseName(c.catalogTable.get.identifier),
                 table = SparkUtils.getTableName(c.catalogTable.get.identifier),
                 name = cd.name,
                 nameIndex = cd.nameIndex,
-                owner = c.catalogTable.get.owner
+                owner = c.catalogTable.get.owner,
+                literal = parentColumn.literal
               )))
             }
           )
@@ -122,13 +134,14 @@ object ColumnLineage extends Logging {
           s"json: ${c.toJSON}")
         if (!c.dataCols.isEmpty) {
           findAggregateColumn(c.dataCols).foreach(cd =>
-            if (cd.name.equals(parentColumn) && cd.nameIndex.equals(parentColumnIndex)) {
+            if (cd.name.equals(parentColumn.name) && cd.nameIndex.equals(parentColumn.nameIndex)) {
               columns = columns.++(Option(ColumnLineage(
                 db = SparkUtils.getDatabaseName(c.tableMeta.identifier),
                 table = SparkUtils.getTableName(c.tableMeta.identifier),
                 name = cd.name,
                 nameIndex = cd.nameIndex,
-                owner = c.tableMeta.owner
+                owner = c.tableMeta.owner,
+                literal = parentColumn.literal
               )))
             }
           )
@@ -155,10 +168,10 @@ object ColumnLineage extends Logging {
               s"aliasindex: ${aliasColumn.nameIndex}, " +
               s"attrs: ${aliasColumn.child.size}, ${aliasColumn.child.toString()}")
 
-            if (aliasColumn.name.eq(parentColumn)
-              && aliasColumn.nameIndex.equals(parentColumnIndex)) {
+            if (aliasColumn.name.eq(parentColumn.name)
+              && aliasColumn.nameIndex.equals(parentColumn.nameIndex)) {
               attrs.foreach(sub =>
-                columns = columns.++(findColumns(c.children, sub.name, sub.nameIndex))
+                columns = columns.++(findColumns(c.children, sub))
               )
             }
 
@@ -172,14 +185,15 @@ object ColumnLineage extends Logging {
           s"projectList: ${c.projectList}, " +
           s"json: ${c.toJSON}")
         for (p <- c.projectList) {
-          if (p.name.equals(parentColumn) && p.exprId.id.equals(parentColumnIndex)) {
+          if (p.name.equals(parentColumn.name) && p.exprId.id.equals(parentColumn.nameIndex)) {
             if (!p.children.isEmpty) {
               val subColumns: Seq[ColumnLineage] = findAggregateColumn(p.children)
               subColumns.foreach(sub =>
-                columns = columns.++(findColumns(c.children, sub.name, sub.nameIndex))
+                columns = columns.++(findColumns(c.children, sub))
               )
             } else {
-              columns = columns.++(findColumns(c.children, p.name, p.exprId.id))
+              columns = columns.++(findColumns(c.children,
+                ColumnLineage(name = p.name, nameIndex = p.exprId.id)))
             }
           }
         }
@@ -188,12 +202,12 @@ object ColumnLineage extends Logging {
           s"e: ${e}, " +
           s"json: ${e.toJSON}")
         if (!e.children.isEmpty) {
-          columns = columns.++(findColumns(e.children, parentColumn, parentColumnIndex))
+          columns = columns.++(findColumns(e.children, parentColumn))
         }
     })
 
-    logDebug(s"[ColumnLineage] findColumns, result, parentName: ${parentColumn}, " +
-      s"parentNameIndex: ${parentColumnIndex}, " +
+    logDebug(s"[ColumnLineage] findColumns, result, parentName: ${parentColumn.name}, " +
+      s"parentNameIndex: ${parentColumn.nameIndex}, " +
       s"subColumnsSize: ${columns.size}, " +
       s"subColumns: ${columns}")
     columns
