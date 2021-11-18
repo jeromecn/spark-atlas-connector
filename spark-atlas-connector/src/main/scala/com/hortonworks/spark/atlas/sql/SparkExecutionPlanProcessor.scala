@@ -45,6 +45,7 @@ import org.apache.spark.sql.execution.columnar.InMemoryRelation
 import org.apache.spark.sql.execution.streaming.StreamExecution
 import org.apache.spark.sql.streaming.SinkProgress
 import org.apache.spark.sql.streaming.StreamingQueryListener.QueryProgressEvent
+import org.apache.spark.sql.types.{ArrayType, DataType, MapType}
 
 import scala.collection.immutable.Stream.Empty
 import scala.collection.mutable
@@ -68,6 +69,17 @@ object ColumnLineage extends Logging {
       case ch: Literal =>
         logDebug(s"[ColumnLineage] findAggregateColumn, expressions, Literal, item:${ch.toJSON}")
       case ch: AttributeReference =>
+        ch.dataType match {
+          case m: ArrayType =>
+            logDebug(s"[ColumnLineage] findAggregateColumn, expressions, " +
+              s"AttributeReference, array:${ch.toJSON}, child: ${ch.children}")
+          case m: MapType =>
+            logDebug(s"[ColumnLineage] findAggregateColumn, expressions, " +
+              s"AttributeReference, map:${ch.toJSON}, child: ${ch.children}")
+          case e =>
+            logDebug(s"[ColumnLineage] findAggregateColumn, expressions, " +
+              s"AttributeReference, other:${ch.toJSON}, child: ${ch.children}")
+        }
         columns = columns.++(Some(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)))
       case e =>
         if (!e.children.isEmpty) {

@@ -69,7 +69,6 @@ class SparkAtlasEventTracker(atlasClient: AtlasClient, atlasClientConf: AtlasCli
   }
 
   override def onSuccess(funcName: String, qe: QueryExecution, durationNs: Long): Unit = {
-
     logDebug(s"[onSuccess] ${funcName}, ${qe.toString()}")
     if (!enabled) {
       // No op if SAC is disabled
