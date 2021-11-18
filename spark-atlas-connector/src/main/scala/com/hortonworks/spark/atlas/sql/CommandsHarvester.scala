@@ -320,7 +320,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               s"json: ${c.toJSON}")
             for (col <- c.outputColumns) {
               val subColumns: Seq[ColumnLineage] = ColumnLineage.findColumns(
-                c.children, col.name, col.exprId.id)
+                c.children, ColumnLineage(name = col.name, nameIndex = col.exprId.id))
               val column = Some(ColumnLineage(
                 db = SparkUtils.getDatabaseName(c.tableDesc),
                 table = SparkUtils.getTableName(c.tableDesc),
@@ -347,7 +347,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               s"json: ${c.toJSON}")
             for (col <- c.outputColumns) {
               val subColumns: Seq[ColumnLineage] = ColumnLineage.findColumns(
-                c.children, col.name, col.exprId.id)
+                c.children, ColumnLineage(name = col.name, nameIndex = col.exprId.id))
               val column = Some(ColumnLineage(
                 db = SparkUtils.getDatabaseName(c.table),
                 table = SparkUtils.getTableName(c.table),
@@ -372,7 +372,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               s"json: ${c.toJSON}")
             for (col <- c.outputColumns) {
               val subColumns: Seq[ColumnLineage] = ColumnLineage.findColumns(
-                c.children, col.name, col.exprId.id)
+                c.children, ColumnLineage(name = col.name, nameIndex = col.exprId.id))
               val column = Some(ColumnLineage(
                 db = SparkUtils.getDatabaseName(c.catalogTable.get.identifier),
                 table = SparkUtils.getTableName(c.catalogTable.get.identifier),
@@ -398,7 +398,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               s"json: ${c.toJSON}")
             for (col <- c.outputColumns) {
               val subColumns: Seq[ColumnLineage] = ColumnLineage.findColumns(
-                c.children, col.name, col.exprId.id)
+                c.children, ColumnLineage(name = col.name, nameIndex = col.exprId.id))
               val column = Some(ColumnLineage(
                 db = SparkUtils.getDatabaseName(c.table.identifier),
                 table = SparkUtils.getTableName(c.table.identifier),
