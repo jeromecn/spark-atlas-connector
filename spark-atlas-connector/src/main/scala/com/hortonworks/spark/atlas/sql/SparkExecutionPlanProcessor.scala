@@ -36,7 +36,7 @@ import org.apache.atlas.model.instance.AtlasObjectId
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.{LocalTempView, PersistedView, UnresolvedRelation}
 import org.apache.spark.sql.catalyst.catalog.HiveTableRelation
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, Literal}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, GetMapValue, Literal}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project}
 import org.apache.spark.sql.connector.write.{DataWriterFactory, PhysicalWriteInfo, WriterCommitMessage}
@@ -81,6 +81,9 @@ object ColumnLineage extends Logging {
               s"AttributeReference, other:${ch.toJSON}, child: ${ch.children}")
         }
         columns = columns.++(Some(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)))
+      case ch: GetMapValue =>
+        logDebug(s"[ColumnLineage] findAggregateColumn, expressions, GetMapValue," +
+          s" item:${ch.toJSON}")
       case e =>
         if (!e.children.isEmpty) {
           columns = columns.++(findAggregateColumn(e.children))
