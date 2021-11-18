@@ -292,13 +292,13 @@ object external extends Logging{
           case "Spark shell" => s"Spark Job + $appId"
           case default => default + s" $appId"
         }
+        var sb: StringBuilder = new StringBuilder
 
-        val queryName = col.child.reduce((a, b) => {
-          s"${a.db}.${a.table}@${a.owner}:${appId}:${b.db}.${b.table}@${b.owner}:${appId}"
-        })
+        col.child.foreach(a => sb.append(s":${a.db}.${a.table}@${a.owner}:${appId}"))
+
         val resultName = s"${col.db}.${col.table}@${col.owner}:${appId}:${col.name}"
 
-        val name = s"QUERY:${queryName}:INSERT:${resultName}"
+        val name = s"QUERY:${sb.toString()}:INSERT:${resultName}"
         entity.setAttribute("qualifiedName", name)
         entity.setAttribute("name", name)
 
