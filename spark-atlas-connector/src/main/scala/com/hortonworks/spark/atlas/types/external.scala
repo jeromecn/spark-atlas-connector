@@ -301,10 +301,18 @@ object external extends Logging{
             s"${col.db}.${col.table}.${col.name}@${col.owner}"))).toSeq
 
         val inputs = col.child.flatMap(c => {
-          Some(SACAtlasEntityReference(
-            new AtlasObjectId(HIVE_COLUMN_TYPE_STRING, "qualifiedName",
-              s"${c.db}.${c.table}.${c.name}@${c.owner}")
-          ))
+          if (c.literal.isEmpty) {
+            Some(SACAtlasEntityReference(
+              new AtlasObjectId(HIVE_COLUMN_TYPE_STRING, "qualifiedName",
+                s"${c.db}.${c.table}.${c.name}@${c.owner}")
+            ))
+          } else {
+            Some(SACAtlasEntityReference(
+              new AtlasObjectId(HIVE_COLUMN_TYPE_STRING, "qualifiedName",
+                s"${c.db}.${c.table}.${c.name}[${c.literal}]@${c.owner}")
+            ))
+          }
+
         }).toSeq
 
         val inputObjIds = inputs.map(_.asObjectId).asJava
