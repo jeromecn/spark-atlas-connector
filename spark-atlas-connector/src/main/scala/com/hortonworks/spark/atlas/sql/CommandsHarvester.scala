@@ -358,7 +358,7 @@ object CommandsHarvester extends AtlasEntityUtils with Logging {
               ))
               columns = columns.++(column)
               logDebug("[makeColumnLineageEntities] [DataWritingCommandExec] " +
-                "InsertIntoHiveTable" +
+                "InsertIntoHiveTable, " +
                 s"col: ${col.name}, " +
                 s"colIndex: ${col.exprId.id}, " +
                 s"columnsTree: ${column}")

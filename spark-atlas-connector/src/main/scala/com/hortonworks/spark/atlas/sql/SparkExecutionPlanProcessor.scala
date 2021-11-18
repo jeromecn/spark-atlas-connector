@@ -36,7 +36,7 @@ import org.apache.atlas.model.instance.AtlasObjectId
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.{LocalTempView, PersistedView, UnresolvedRelation}
 import org.apache.spark.sql.catalyst.catalog.HiveTableRelation
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, Literal}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project}
 import org.apache.spark.sql.connector.write.{DataWriterFactory, PhysicalWriteInfo, WriterCommitMessage}
@@ -65,6 +65,8 @@ object ColumnLineage extends Logging {
     var columns: Seq[ColumnLineage] = Seq.empty
 
     expressions.foreach(ep => ep match {
+      case ch: Literal =>
+        logDebug(s"[ColumnLineage] findAggregateColumn, expressions, Literal, item:${ch.toJSON}")
       case ch: AttributeReference =>
         columns = columns.++(Some(ColumnLineage(name = ch.name, nameIndex = ch.exprId.id)))
       case e =>
